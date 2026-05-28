@@ -218,7 +218,6 @@
 
 <div id="app">
     <div class="header" id="headerTitle">
-        <button class="header-btn" onclick="startGame()">✨ 开启人生</button>
         霍格沃茨模拟器
     </div>
 
@@ -414,9 +413,17 @@
                 <div class="info-row"><span class="info-label">消耗 Tokens</span><span class="info-value" id="stat-tokens">0</span></div>
                 <div class="info-row"><span class="info-label">生成字数</span><span class="info-value" id="stat-chars">0</span></div>
             </div>
+
+            <!-- 游戏控制 -->
+            <div class="card settings-group" style="border-left-color: #990000; margin-bottom: 30px;">
+                <h4>🚀 游戏控制</h4>
+                <button class="btn" style="background-color: #990000; text-align: center; font-size: 16px; padding: 12px; font-weight: bold;" onclick="startGame()">✨ 开启 / 重置人生</button>
+                <div style="font-size: 12px; color: gray; text-align: center; margin-top: 5px;">点击将清空当前进度并重新生成初始身份</div>
+            </div>
         </div>
     </div>
 
+    <!-- 底部导航 -->
     <!-- 底部导航 -->
     <div class="nav-bar">
         <div class="nav-item active" onclick="switchTab('main', this)">
