@@ -199,7 +199,20 @@
         }
         .custom-option-area input { margin-bottom: 0; flex: 1; }
         .custom-option-area button { width: auto; margin-bottom: 0; white-space: nowrap; }
-    </style>
+				        /* 属性进度条与成绩样式 */
+        .progress-container { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
+        .progress-label { width: 85px; color: gray; flex-shrink: 0; }
+        .progress-bar-bg { flex: 1; background: var(--border-color); height: 8px; border-radius: 4px; margin: 0 10px; overflow: hidden; }
+        .progress-bar-fill { background: var(--primary-color); height: 100%; transition: width 0.3s; }
+        .progress-value { width: 45px; text-align: right; font-size: 12px; font-weight: bold; }
+        
+        .grade-section { margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
+        .grade-title { font-weight: bold; font-size: 13px; margin-bottom: 8px; color: var(--primary-color); }
+        .grade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: x; row-gap: 6px; column-gap: 15px; font-size: 12px; }
+        .grade-item { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 2px;}
+        .grade-item span:last-child { font-weight: bold; }
+    
+		</style>
 </head>
 <body>
 
@@ -231,12 +244,24 @@
                 <div class="info-row"><span class="info-label">资产状况</span><span class="info-value" id="mc-assets">待生成...</span></div>
             </div>
 
-            <div class="card">
+             <div class="card">
                 <div class="card-title">✨ 魔法能力与档案</div>
                 <div class="info-row"><span class="info-label">魔杖</span><span class="info-value" id="mc-wand">待生成...</span></div>
                 <div class="info-row"><span class="info-label">魔法天赋</span><span class="info-value" id="mc-talent">待生成...</span></div>
                 <div class="info-row"><span class="info-label">特殊天赋</span><span class="info-value" id="mc-special">待生成...</span></div>
                 <div class="info-row"><span class="info-label">魔法部档案</span><span class="info-value" id="mc-record">待生成...</span></div>
+                
+                <!-- 个人属性进度条 -->
+                <div class="grade-section">
+                    <div class="grade-title">📊 个人属性</div>
+                    <div id="attributes-container">待生成...</div>
+                </div>
+
+                <!-- 成绩单 -->
+                <div class="grade-section">
+                    <div class="grade-title">📜 学业成绩 (O-E-A-P-D-T)</div>
+                    <div id="grades-container">待生成...</div>
+                </div>
             </div>
 
             <div class="card">
@@ -971,7 +996,14 @@ c.多人交互对话
         main: {
             era: "", time: "", location: "", weather: "", news: "",
             name: "", blood: "", age: "", appearance: "", family: "", assets: "",
-            wand: "", talent: "", special: "", record: "", log: ""
+            wand: "", talent: "", special: "", record: "", log: "",
+            attributes: {
+                dada: 0, darkArts: 0, transfiguration: 0, divination: 0, potions: 0, charms: 0
+            },
+            grades: {
+                dada: 0, charms: 0, astronomy: 0, potions: 0, herbology: 0, history: 0, transfiguration: 0,
+                arithmancy: 0, comc: 0, divination: 0, runes: 0, muggle: 0
+            }
         },
         story: {
             text: "",
@@ -1000,9 +1032,18 @@ c.多人交互对话
         renderPresets();
     };
 
+    // 成绩转换函数
+    function getGradeLetter(score) {
+        if(score <= 10) return 'T';
+        if(score <= 30) return 'D';
+        if(score <= 59) return 'P';
+        if(score <= 70) return 'A';
+        if(score <= 80) return 'E';
+        return 'O';
+    }
+
     // --- UI 更新逻辑 ---
     function updateUI() {
-        // 更新主控
         const m = gameState.main;
         document.getElementById('mc-era').innerText = m.era || "待生成...";
         document.getElementById('mc-time').innerText = m.time || "待生成...";
@@ -1021,7 +1062,61 @@ c.多人交互对话
         document.getElementById('mc-record').innerText = m.record || "待生成...";
         document.getElementById('mc-log').innerText = m.log || "暂无日志...";
 
-        // 更新剧情 (改为周)
+        // 渲染个人属性进度条
+        if (m.attributes) {
+            const attrMap = {
+                dada: "黑魔法防御术", darkArts: "黑魔法", transfiguration: "变形术", 
+                divination: "占卜学", potions: "魔药学", charms: "魔咒学"
+            };
+            let attrHtml = '';
+            for (let key in attrMap) {
+                let val = m.attributes[key] || 0;
+                if(val > 100) val = 100;
+                attrHtml += `
+                <div class="progress-container">
+                    <div class="progress-label">${attrMap[key]}</div>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${val}%;"></div></div>
+                    <div class="progress-value">${val}/100</div>
+                </div>`;
+            }
+            document.getElementById('attributes-container').innerHTML = attrHtml;
+        }
+
+        // 渲染成绩
+        if (m.grades) {
+            const age = parseInt(m.age) || 11;
+            const isYear5 = age >= 15; // 11岁入学，15岁五年级
+            
+            const reqMap = {
+                dada: "黑魔法防御术", charms: "魔咒课", astronomy: "天文学", 
+                potions: "魔药课", herbology: "草药学", history: "魔法史", transfiguration: "变形术"
+            };
+            const optMap = {
+                arithmancy: "算数占卜", comc: "神奇动物保护", divination: "占卜学", 
+                runes: "古代魔文", muggle: "麻瓜研究"
+            };
+
+            let gradeHtml = '<div style="color:gray; margin-bottom:5px;">必修课</div><div class="grade-grid">';
+            for (let key in reqMap) {
+                let score = m.grades[key] || 0;
+                gradeHtml += `<div class="grade-item"><span>${reqMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
+            }
+            gradeHtml += '</div>';
+
+            if (isYear5) {
+                gradeHtml += '<div style="color:gray; margin-top:10px; margin-bottom:5px;">选修课 (五年级及以上)</div><div class="grade-grid">';
+                for (let key in optMap) {
+                    let score = m.grades[key] || 0;
+                    gradeHtml += `<div class="grade-item"><span>${optMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
+                }
+                gradeHtml += '</div>';
+            } else {
+                gradeHtml += '<div style="color:gray; margin-top:10px; font-size:12px; text-align:center;">选修课将在五年级(15岁)开启</div>';
+            }
+            document.getElementById('grades-container').innerHTML = gradeHtml;
+        }
+
+        // 更新剧情
         document.getElementById('story-time').innerText = `第 ${gameState.turn} 周 📅`;
         if(gameState.story.text) {
             document.getElementById('storyText').innerText = gameState.story.text;
@@ -1269,6 +1364,12 @@ ${JSON.stringify(gameState.main)}
 背包：${JSON.stringify(gameState.inventory)}
 社交：${JSON.stringify(gameState.npcs)}
 
+【重要数值规则】
+1. 个人属性(attributes)和成绩(grades)平时不要随意增加！必须与剧情推进或背包物品使用严格挂钩。
+2. 只有当剧情中明确发生了学习、训练或奇遇时，才允许增加对应数值。
+3. 如果数值有提升，必须在剧情文本(story.text)中明确写出，例如：“上了一节魔药课，受益匪浅 魔药学+10”。
+4. 成绩等级对应：T(0-10), D(11-30), P(31-59), A(60-70), E(71-80), O(81-100)。
+
 【重要输出要求】
 你必须且只能输出一个合法的JSON对象，不要包含任何Markdown标记（如 \`\`\`json ），不要有任何前言后语。JSON格式必须严格如下：
 {
@@ -1276,10 +1377,12 @@ ${JSON.stringify(gameState.main)}
     "era": "时代背景", "time": "当前时间", "location": "当前地点", "weather": "天气", "news": "热点事件",
     "name": "姓名", "blood": "血统", "age": "年龄", "appearance": "外貌", "family": "家族", "assets": "资产",
     "wand": "魔杖", "talent": "天赋", "special": "特殊", "record": "档案",
-    "log": "周日常互动日志(正常文本记录，不要伪代码)"
+    "log": "周日常互动日志(正常文本记录，不要伪代码)",
+    "attributes": { "dada": 0, "darkArts": 0, "transfiguration": 0, "divination": 0, "potions": 0, "charms": 0 },
+    "grades": { "dada": 0, "charms": 0, "astronomy": 0, "potions": 0, "herbology": 0, "history": 0, "transfiguration": 0, "arithmancy": 0, "comc": 0, "divination": 0, "runes": 0, "muggle": 0 }
   },
   "story": {
-    "text": "本周的剧情描述，必须严格≥3000字，包含细腻的环境、心理、对话描写。",
+    "text": "本周的剧情描述，必须严格≥3000字，包含细腻的环境、心理、对话描写。如有数值提升需在文末注明。",
     "options": ["选项1", "选项2", "选项3", "选项4", "选项5"]
   },
   "inventory": [
