@@ -63,6 +63,19 @@
             font-weight: bold;
             letter-spacing: 2px;
             z-index: 10;
+            position: relative;
+        }
+        
+        .header-btn {
+            position: absolute;
+            left: 10px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
         }
 
         /* 内容区域 */
@@ -92,8 +105,8 @@
         .card-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
         
         .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; border-bottom: 1px dashed var(--border-color); padding-bottom: 3px;}
-        .info-label { color: gray; }
-        .info-value { font-weight: bold; text-align: right; max-width: 65%;}
+        .info-label { color: gray; flex-shrink: 0; margin-right: 10px;}
+        .info-value { font-weight: bold; text-align: right; word-break: break-all;}
 
         /* 按钮样式 */
         .btn {
@@ -110,6 +123,7 @@
             text-align: left;
         }
         .btn:active { opacity: 0.8; }
+        .btn:disabled { background-color: gray; cursor: not-allowed; }
         .btn-outline { background: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-align: center;}
 
         /* 底部导航栏 */
@@ -173,75 +187,100 @@
         .log-box { height: 100px; overflow-y: auto; background: #000; color: #0f0; font-family: monospace; font-size: 12px; padding: 5px; border-radius: 4px; }
         .log-entry { border-bottom: 1px dashed #333; padding: 2px 0; }
         
-        .code-block { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; overflow-x: auto; margin-top: 10px;}
+        .code-block { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; overflow-x: auto; margin-top: 10px; white-space: pre-wrap;}
+        
+        /* 自定义选项输入区 */
+        .custom-option-area {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 10px;
+        }
+        .custom-option-area input { margin-bottom: 0; flex: 1; }
+        .custom-option-area button { width: auto; margin-bottom: 0; white-space: nowrap; }
+        
+        /* Loading 遮罩 */
+        #loadingOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 200;
+            color: white; flex-direction: column; font-weight: bold;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <div id="app">
-    <div class="header" id="headerTitle">⚡ 霍格沃茨 ⚡</div>
+    <div class="header" id="headerTitle">
+        <button class="header-btn" onclick="startGame()">✨ 开启人生</button>
+        ⚡ 霍格沃茨 ⚡
+    </div>
 
     <div class="content">
         <!-- 主控界面 -->
         <div id="view-main" class="view active">
             <div class="card">
                 <div class="card-title">🌍 时代背景与环境</div>
-                <div class="info-row"><span class="info-label">时代背景</span><span class="info-value" id="mc-era">子世代 (1991年)</span></div>
-                <div class="info-row"><span class="info-label">当前时间</span><span class="info-value" id="mc-time">星期二 1991/7/31 AM 10:00</span></div>
-                <div class="info-row"><span class="info-label">当前地点</span><span class="info-value" id="mc-location">伦敦·对角巷</span></div>
-                <div class="info-row"><span class="info-label">天气情况</span><span class="info-value" id="mc-weather">阴天，微风，带着伦敦特有的潮湿雾气</span></div>
-                <div class="info-row"><span class="info-label">热点事件</span><span class="info-value" id="mc-news">古灵阁发生非法闯入事件，713号金库被清空。</span></div>
+                <div class="info-row"><span class="info-label">时代背景</span><span class="info-value" id="mc-era">待生成...</span></div>
+                <div class="info-row"><span class="info-label">当前时间</span><span class="info-value" id="mc-time">待生成...</span></div>
+                <div class="info-row"><span class="info-label">当前地点</span><span class="info-value" id="mc-location">待生成...</span></div>
+                <div class="info-row"><span class="info-label">天气情况</span><span class="info-value" id="mc-weather">待生成...</span></div>
+                <div class="info-row"><span class="info-label">热点事件</span><span class="info-value" id="mc-news">待生成...</span></div>
             </div>
 
             <div class="card">
                 <div class="card-title">🧙‍♂️ 巫师档案</div>
-                <div class="info-row"><span class="info-label">姓名</span><span class="info-value" id="mc-name">哈利·波特</span></div>
-                <div class="info-row"><span class="info-label">血统</span><span class="info-value">混血 (父系纯血/母系麻瓜出身)</span></div>
-                <div class="info-row"><span class="info-label">年龄</span><span class="info-value">11岁</span></div>
-                <div class="info-row"><span class="info-label">外貌特征</span><span class="info-value">闪电伤疤，圆框眼镜，凌乱黑发，穿着不合身的麻瓜旧衣服。</span></div>
-                <div class="info-row"><span class="info-label">家族立场</span><span class="info-value">反伏地魔联盟 / 凤凰社核心</span></div>
-                <div class="info-row"><span class="info-label">资产状况</span><span class="info-value">古灵阁金库：50,000 加隆 (波特家族遗产)</span></div>
+                <div class="info-row"><span class="info-label">姓名</span><span class="info-value" id="mc-name">待生成...</span></div>
+                <div class="info-row"><span class="info-label">血统</span><span class="info-value" id="mc-blood">待生成...</span></div>
+                <div class="info-row"><span class="info-label">年龄</span><span class="info-value" id="mc-age">待生成...</span></div>
+                <div class="info-row"><span class="info-label">外貌特征</span><span class="info-value" id="mc-appearance">待生成...</span></div>
+                <div class="info-row"><span class="info-label">家族立场</span><span class="info-value" id="mc-family">待生成...</span></div>
+                <div class="info-row"><span class="info-label">资产状况</span><span class="info-value" id="mc-assets">待生成...</span></div>
             </div>
 
             <div class="card">
                 <div class="card-title">✨ 魔法能力与档案</div>
-                <div class="info-row"><span class="info-label">魔杖</span><span class="info-value">冬青木，凤凰羽毛，11英寸，柔软灵活</span></div>
-                <div class="info-row"><span class="info-label">魔法天赋</span><span class="info-value">黑魔法防御术专精，魁地奇找球手极佳天赋</span></div>
-                <div class="info-row"><span class="info-label">特殊天赋</span><span class="info-value">蛇佬腔 (魂片影响值37%)</span></div>
-                <div class="info-row"><span class="info-label">魔法部档案</span><span class="info-value">暂无违法记录。受到重点保护。</span></div>
+                <div class="info-row"><span class="info-label">魔杖</span><span class="info-value" id="mc-wand">待生成...</span></div>
+                <div class="info-row"><span class="info-label">魔法天赋</span><span class="info-value" id="mc-talent">待生成...</span></div>
+                <div class="info-row"><span class="info-label">特殊天赋</span><span class="info-value" id="mc-special">待生成...</span></div>
+                <div class="info-row"><span class="info-label">魔法部档案</span><span class="info-value" id="mc-record">待生成...</span></div>
             </div>
 
             <div class="card">
                 <div class="card-title">📅 周日常互动日志</div>
-                <div class="code-block" id="mc-log">
-1991年7月31日 星期二
-08:00 海格砸开了礁石小屋的门(门板-1)
-08:15 达力长出了一条猪尾巴(惊恐值+99)
-09:30 乘坐小船离开礁石岛(体力-5)
-10:00 抵达破釜酒吧(声望检定触发)
-10:15 奇洛教授握手(触发伤疤刺痛)
-10:30 进入对角巷(开启魔法世界)
-                </div>
+                <div class="code-block" id="mc-log">暂无日志...</div>
             </div>
         </div>
 
         <!-- 剧情界面 -->
         <div id="view-story" class="view">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
-                <span style="font-weight: bold; font-size: 14px; color: var(--primary-color);" id="story-time">第 1 回合 | 1991/7/31</span>
+                <button class="btn btn-outline" onclick="prevWeek()" style="width: auto; padding: 4px 8px; margin: 0;">◀ 上一周</button>
+                <span style="font-weight: bold; font-size: 14px; color: var(--primary-color);" id="story-time">第 0 周 | 待开启</span>
+                <button class="btn btn-outline" onclick="regenerateWeek()" style="width: auto; padding: 4px 8px; margin: 0;">重新生成 ↻</button>
             </div>
             
             <div class="card">
-                <div class="card-title">📜 剧情事件：奥利凡德魔杖店</div>
+                <div class="card-title">📜 剧情事件</div>
                 <div class="card-text" id="storyText" style="height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; background: var(--bg-color);">
-                    加载中...
+                    点击左上角【✨ 开启人生】开始你的霍格沃茨之旅...
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-title">🎯 抉择时刻</div>
                 <div id="storyOptions">
-                    <!-- 选项动态生成 -->
+                    <div style="color:gray; text-align:center; font-size:12px;">暂无选项</div>
+                </div>
+                <!-- 自定义选项区 -->
+                <div class="custom-option-area">
+                    <input type="text" id="customActionInput" placeholder="自主填写你的行动...">
+                    <button class="btn btn-outline" onclick="submitCustomAction()">提交</button>
                 </div>
             </div>
         </div>
@@ -250,7 +289,9 @@
         <div id="view-inventory" class="view">
             <div class="card">
                 <div class="card-title">🎒 物品栏 (交互触发)</div>
-                <div id="inventoryList"></div>
+                <div id="inventoryList">
+                    <div style="color:gray; text-align:center; font-size:12px; padding:10px;">空空如也</div>
+                </div>
             </div>
         </div>
 
@@ -258,7 +299,9 @@
         <div id="view-social" class="view">
             <div class="card">
                 <div class="card-title">🦉 巫师通讯录</div>
-                <div id="socialList"></div>
+                <div id="socialList">
+                    <div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>
+                </div>
             </div>
         </div>
 
@@ -330,6 +373,14 @@
                 </select>
                 <h5 style="margin: 10px 0 5px 0;">API 调用日志</h5>
                 <div class="log-box" id="apiLog"></div>
+                </div>
+						</div>
+						
+						<!-- 数据统计 -->
+            <div class="card settings-group">
+                <h4>📊 游玩统计</h4>
+                <div class="info-row"><span class="info-label">消耗 Tokens</span><span class="info-value" id="stat-tokens">0</span></div>
+                <div class="info-row"><span class="info-label">生成字数</span><span class="info-value" id="stat-chars">0</span></div>
             </div>
         </div>
     </div>
@@ -362,6 +413,12 @@
                 <button class="btn btn-outline" style="width: auto;" onclick="closeModal()">关闭</button>
             </div>
         </div>
+    </div>
+    
+    <!-- Loading 遮罩 -->
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText">猫头鹰正在送信中...</div>
     </div>
 </div>
 
@@ -899,88 +956,126 @@ c.多人交互对话
 2.添加边框和颜色美化界面，优化排版。
 3.关键节点用>分隔，避免横向滑动，行距加倍清爽。
 重点！！！
-以上所有文档内容和补充内容都必须存档录入！必须存档录入！重点标红！`;
+以上所有文档内容和补充内容都必须存档录入！必须存档录入！重点标红！）`;
 
-    // --- 游戏核心数据状态 ---
+        // --- 游戏核心数据状态 (初始全空) ---
     let gameState = {
-        turn: 1,
+        turn: 0,
+        history: [], // 用于保存历史记录以实现回溯
+        lastPrompt: "", // 记录上一次的请求，用于重新生成
+        stats: { totalTokens: 0, totalChars: 0 }, // 统计数据
         characterLore: "",
         presets: [], 
-        inventory: [
-            { id: 1, name: "🪄 冬青木魔杖", desc: "十一英寸长，冬青木，凤凰羽毛杖芯。非常柔韧。\n【交互】握在手中时，指尖能感到一阵微热的魔力共鸣。", effect: "施法契合度 100%，黑魔法防御术威力提升", amount: 1 },
-            { id: 2, name: "💰 古灵阁金币袋", desc: "装满了金加隆、银西可和铜纳特。\n【交互】摇晃时发出清脆的金属碰撞声，对角巷商铺物价波动检测中。", effect: "资产：50,000 加隆", amount: 1 },
-            { id: 3, name: "🦉 霍格沃茨录取通知书", desc: "羊皮纸信封，翠绿色墨水地址，紫色蜡封印着霍格沃茨校徽。\n【交互】麦格教授亲笔签名，附带一年级新生购物清单。", effect: "解锁主线：对角巷采购", amount: 1 }
-        ],
-        npcs: [
-            { id: 1, name: "鲁伯·海格", house: "格兰芬多(前)", relation: 85, desc: "霍格沃茨钥匙保管员。半巨人血统。\n【情报】他非常喜欢危险的神奇动物，刚刚送了你一个海德薇作为生日礼物。\n【信任值】极高" },
-            { id: 2, name: "加里克·奥利凡德", house: "拉文克劳", relation: 30, desc: "英国最优秀的魔杖制作人。\n【情报】拥有惊人的记忆力，记得他卖出的每一根魔杖。对伏地魔的魔杖有着复杂的敬畏。\n【信任值】中立" },
-            { id: 3, name: "德拉科·马尔福", house: "斯莱特林(预定)", relation: -15, desc: "纯血家族马尔福家的少爷。\n【情报】在摩金夫人长袍店遇到，态度傲慢，对麻瓜出身者抱有强烈偏见。\n【信任值】敌对" }
-        ],
+        main: {
+            era: "", time: "", location: "", weather: "", news: "",
+            name: "", blood: "", age: "", appearance: "", family: "", assets: "",
+            wand: "", talent: "", special: "", record: "", log: ""
+        },
+        story: {
+            text: "",
+            options: []
+        },
+        inventory: [],
+        npcs: [],
         settings: {
             theme: "light",
             primaryColor: "#000000",
             apiUrl: "https://api.openai.com",
-            apiKey: ""
+            apiKey: "",
+            apiModel: ""
         }
     };
-
-    // --- 3000字超长细腻剧情生成 ---
-    const epicStoryText = `　　伦敦的天空被一层厚重的、铅灰色的云层笼罩着，空气中弥漫着泰晤士河特有的潮湿水汽和麻瓜街道上汽车尾气的混合味道。你跟在海格巨大的身躯后面，穿过查林十字街拥挤的人潮。麻瓜们行色匆匆，却仿佛被施了混淆咒一般，对海格那足有常人两倍高、五倍宽的惊人体型视而不见。
-　　“就在这儿，哈利。”海格停下脚步，指着一家夹在大书店和唱片店之间、看起来破破烂烂的小酒吧。如果不是海格指出来，你发誓你绝对不会注意到它。它的招牌已经斑驳不清，上面写着“破釜酒吧”。
-　　推开那扇沉重的木门，一股混合着劣质雪利酒、烤肉和陈年烟草的气味扑面而来。酒吧里光线昏暗，几个老太婆坐在角落里喝着小杯的雪利酒，其中一个正在抽一根长长的烟袋。当你走进去时，原本嘈杂的交谈声瞬间消失了。
-　　“老规矩，海格？”吧台后那个头发几乎掉光、长得像瘪胡桃似的酒保汤姆问道。
-　　“不了，汤姆，我正在为霍格沃茨办事。”海格用他那巨大的手掌拍了拍你的肩膀，差点把你拍得跪在地上，“这是哈利，哈利·波特。”
-　　整个破釜酒吧瞬间陷入了死一般的寂静。紧接着，椅子摩擦地板的刺耳声响起，人们蜂拥而至。你感到无数双粗糙的手在和你握手，耳边充斥着“波特先生，真是荣幸”、“我简直不敢相信”的惊叹声。在人群中，你看到了一个戴着大围巾、神色极其紧张的年轻人。
-　　“奇、奇洛教授！”海格介绍道，“他将在霍格沃茨教你黑魔法防御术。”
-　　奇洛教授结结巴巴地和你握手，当他的手指触碰到你的那一刻，你额头上的闪电伤疤突然传来一阵尖锐的刺痛，就像是被烧红的铁丝扎了一下。你猛地缩回手，心跳微微加速，但奇洛似乎比你更害怕，迅速缩回了手，眼神闪躲。
-　　好不容易摆脱了人群，海格带着你穿过吧台，来到后边的一个小天井里。这里除了一个垃圾桶和一些杂草，什么也没有。
-　　“往上数三块，再往横里数两块。”海格一边嘀咕着，一边用他那把粉红色的破伞在墙上敲击了三下。
-　　奇迹发生了。那块砖抖动起来，中间出现了一个小洞，洞口越变越大，不多时，一条足以让海格通过的宽阔的拱道出现在你面前，通向一条蜿蜒曲折、看不见尽头的鹅卵石街道。
-　　“欢迎来到对角巷，哈利。”海格自豪地说。
-　　阳光似乎在这里变得明媚起来，照耀着街道两旁琳琅满目的店铺。你看到了卖坩埚的商店，外面挂着“铜制、黄铜制、锡镴制、银制坩埚，型号齐全，自动搅拌，可折叠”的招牌；你听到了猫头鹰的咕咕叫声，闻到了从药房飘出的刺鼻的蝙蝠脾脏和鳗鱼眼珠的气味。
-　　在古灵阁提取了父母留下的巨额遗产后（那堆积如山的金加隆让你第一次意识到自己其实非常富有），你来到了摩金夫人长袍专卖店。在那里，你遇到了一个面色苍白、下巴尖尖的男孩——德拉科·马尔福。他正站在脚凳上任由别针在他身上飞舞，嘴里不停地谈论着纯血统、斯莱特林和飞天扫帚。他的傲慢和对麻瓜出身者的蔑视让你感到极度不适，这让你想起了达力。
-　　“好了，哈利，现在只剩下最重要的一件东西了。”海格在店外等你，手里提着一个装满雪白猫头鹰的笼子，“魔杖。你得去奥利凡德那里。”
-　　奥利凡德魔杖店又小又破，门上的金字招牌已经剥落，写着：奥利凡德，自公元前三百八十二年即制作精良魔杖。橱窗里褪色的紫色软垫上孤零零地摆着一根魔杖。
-　　推开门，店里传来一阵清脆的铃声。店堂里很小，除了一张长椅，什么也没有。成千上万个狭长的纸盒几乎码到了天花板上。这里的空气中弥漫着一种神秘的、充满魔力的灰尘味，让你感到后背的汗毛都竖了起来。
-　　“下午好。”一个轻柔的声音突然响起，把你吓了一跳。
-　　一个老头站在你面前，他那对颜色很浅的大眼睛在暗淡的店铺里像两轮闪亮的月亮。
-　　“你好。”你紧张地咽了口唾沫。
-　　“啊，是的，”老头说，“是的，是的。我早就知道你会来，哈利·波特。这简直像昨天的事。你父亲在这里买走了他的第一根魔杖，桃花心木，十一英寸长，柔韧，非常适合变形术。而你母亲，柳条，十又四分之一英寸，挥舞起来嗖嗖作响，非常适合施魔咒。”
-　　奥利凡德先生走近你，他那银白色的眼睛紧紧盯着你额头上的闪电伤疤。
-　　“很抱歉，是我卖出了那根造成这道伤疤的魔杖。”他轻声说，“十三英寸半，紫杉木。力量强大，非常强大，却落到了坏人手里……好了，波特先生，让我看看。”
-　　他从衣袋里掏出一卷印有银色刻度的卷尺，开始测量你的胳膊、身高，甚至鼻孔之间的距离。
-　　“每一根奥利凡德魔杖都具有超强的魔法物质，这也就是它的杖芯。我们用独角兽毛、凤凰尾羽和龙的神经。没有两根奥利凡德魔杖是一样的。记住，波特先生，是魔杖选择巫师。”
-　　接下来的半个小时里，你试了一根又一根魔杖。有的刚拿起来就被奥利凡德一把夺走，有的挥舞时炸碎了旁边的花瓶。试过的魔杖在长椅上堆成了小山，但奥利凡德不仅没有不耐烦，反而显得越来越兴奋。
-　　“一位挑剔的顾客，嗯？不要紧，我们这里总能找到一款最完美的。让我想想……哦，有了，为什么不试试这个呢？非同寻常的组合，冬青木，凤凰羽毛，十一英寸长，不错，也柔韧。”
-　　你接过那根魔杖。突然，你的指尖感到一阵微热。你将魔杖高举过头顶，嗖的一声向下一挥，划过满是灰尘的空气。只见一道红光，魔杖头上像放烟花似的金星四射，跳动着的光斑投射在四壁上。
-　　海格鼓起掌来，但奥利凡德先生却大喊起来：“哦，好极了！哦，真的，太好了。可是，太奇妙了……真是太奇妙了……”
-　　他把魔杖装进盒子里，用棕色纸包好。
-　　“对不起，”你忍不住问道，“什么太奇妙了？”
-　　奥利凡德先生用他那苍白的眼睛注视着你。
-　　“我记得我卖出的每一根魔杖，波特先生。每一根。刚才那根魔杖的杖芯，是一只凤凰的尾羽。那只凤凰只拔了两根羽毛。奇妙的是，它的另一根羽毛，正是给你留下这道伤疤的那根魔杖的杖芯。”
-　　你感到一阵寒意顺着脊背爬了上来。
-　　“是的，十三英寸半，紫杉木。是魔杖选择巫师，波特先生。我想，我们有理由期待你做出一番大事业……毕竟，那个连名字都不能提的人，也做了许多大事——尽管可怕，但确实是大事。”
-　　你付了七个金加隆，拿着魔杖走出了店铺。阳光依旧明媚，但奥利凡德的话语却像阴影一样盘旋在你的心头。
-　　现在，你站在对角巷的街头，手里握着这根命中注定的魔杖。海格正在不远处买冰淇淋。你接下来该怎么做？`;
 
     // --- 初始化 ---
     window.onload = () => {
         document.getElementById('referenceText').value = coreReferenceText;
         applySettings();
-        renderStory();
-        renderInventory();
-        renderSocial();
+        updateUI();
         document.getElementById('characterLore').value = gameState.characterLore;
         document.getElementById('apiUrl').value = gameState.settings.apiUrl;
         document.getElementById('apiKey').value = gameState.settings.apiKey;
         renderPresets();
     };
+    
+    // --- UI 更新逻辑 ---
+    function updateUI() {
+        // 更新主控
+        const m = gameState.main;
+        document.getElementById('mc-era').innerText = m.era || "待生成...";
+        document.getElementById('mc-time').innerText = m.time || "待生成...";
+        document.getElementById('mc-location').innerText = m.location || "待生成...";
+        document.getElementById('mc-weather').innerText = m.weather || "待生成...";
+        document.getElementById('mc-news').innerText = m.news || "待生成...";
+        document.getElementById('mc-name').innerText = m.name || "待生成...";
+        document.getElementById('mc-blood').innerText = m.blood || "待生成...";
+        document.getElementById('mc-age').innerText = m.age || "待生成...";
+        document.getElementById('mc-appearance').innerText = m.appearance || "待生成...";
+        document.getElementById('mc-family').innerText = m.family || "待生成...";
+        document.getElementById('mc-assets').innerText = m.assets || "待生成...";
+        document.getElementById('mc-wand').innerText = m.wand || "待生成...";
+        document.getElementById('mc-talent').innerText = m.talent || "待生成...";
+        document.getElementById('mc-special').innerText = m.special || "待生成...";
+        document.getElementById('mc-record').innerText = m.record || "待生成...";
+        document.getElementById('mc-log').innerText = m.log || "暂无日志...";
 
-    // --- 导航与UI逻辑 ---
+        // 更新剧情 (改为周)
+        document.getElementById('story-time').innerText = `第 ${gameState.turn} 周`;
+        if(gameState.story.text) {
+            document.getElementById('storyText').innerText = gameState.story.text;
+        }
+        
+        const optContainer = document.getElementById('storyOptions');
+        if(gameState.story.options && gameState.story.options.length > 0) {
+            let html = '';
+            gameState.story.options.forEach((opt, index) => {
+                html += `<button class="btn" onclick="selectOption('${opt}')">[选项${index+1}] ${opt}</button>`;
+            });
+            optContainer.innerHTML = html;
+        } else {
+            optContainer.innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">暂无选项</div>`;
+        }
+
+        // 更新背包
+        const invList = document.getElementById('inventoryList');
+        invList.innerHTML = '';
+        if(gameState.inventory.length === 0) {
+            invList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">空空如也</div>';
+        } else {
+            gameState.inventory.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<span>${item.name}</span> <span style="color:gray;">x${item.amount}</span>`;
+                div.onclick = () => showItem(item.id);
+                invList.appendChild(div);
+            });
+        }
+
+        // 更新社交
+        const socList = document.getElementById('socialList');
+        socList.innerHTML = '';
+        if(gameState.npcs.length === 0) {
+            socList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>';
+        } else {
+            gameState.npcs.forEach(npc => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<span>${npc.name}</span> <span style="font-size:12px; color:var(--primary-color);">${npc.house} | 好感:${npc.relation}</span>`;
+                div.onclick = () => showNPC(npc.id);
+                socList.appendChild(div);
+            });
+        }
+
+        // 更新统计
+        if(document.getElementById('stat-tokens')) {
+            document.getElementById('stat-tokens').innerText = gameState.stats.totalTokens;
+            document.getElementById('stat-chars').innerText = gameState.stats.totalChars;
+        }
+    }
+
+    // --- 导航与模态框 ---
     function switchTab(tabId, element) {
         document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        
         document.getElementById(`view-${tabId}`).classList.add('active');
         element.classList.add('active');
     }
@@ -988,51 +1083,13 @@ c.多人交互对话
     function openModal(title, content, actionsHtml = '') {
         document.getElementById('modalTitle').innerText = title;
         document.getElementById('modalContent').innerText = content;
-        
         let defaultAction = `<button class="btn btn-outline" style="width:auto;" onclick="closeModal()">关闭</button>`;
         document.getElementById('modalActions').innerHTML = actionsHtml + defaultAction;
-        
         document.getElementById('commonModal').style.display = 'flex';
     }
 
     function closeModal() {
         document.getElementById('commonModal').style.display = 'none';
-    }
-
-    // --- 剧情系统 ---
-    function renderStory() {
-        document.getElementById('story-time').innerText = `第 ${gameState.turn} 回合 | 1991/7/31`;
-        document.getElementById('storyText').innerText = epicStoryText;
-        
-        const optionsHtml = `
-            <button class="btn" onclick="advanceTurn(1)">[事件1] 仔细端详手中的冬青木魔杖，感受魔力共鸣，随后走向海格分享喜悦。</button>
-            <button class="btn" onclick="advanceTurn(2)">[事件2] 回想起奥利凡德的话，心中涌起不安，决定去丽痕书店寻找关于伏地魔的历史书籍。</button>
-            <button class="btn" onclick="advanceTurn(3)">[事件3] 摸了摸口袋里的古灵阁金币，决定去韦斯莱魔法把戏坊(如果存在)或恶作剧商店看看。</button>
-            <button class="btn" onclick="advanceTurn(4)">[事件4] 脑海中闪过德拉科·马尔福傲慢的脸，暗自发誓要在霍格沃茨证明自己的实力。</button>
-            <button class="btn" onclick="advanceTurn(5)">[事件5] 抚摸着笼子里的雪白猫头鹰海德薇，决定先给她买点高级猫头鹰粮。</button>
-        `;
-        document.getElementById('storyOptions').innerHTML = optionsHtml;
-    }
-
-    function advanceTurn(optionId) {
-        gameState.turn++;
-        alert(`你选择了选项 ${optionId}。\n时间线推进至第 ${gameState.turn} 回合。\n(注：此处为演示，实际游戏将根据API生成下一回合的3000字剧情)`);
-        document.getElementById('story-time').innerText = `第 ${gameState.turn} 回合 | 1991/8/1`;
-        document.getElementById('storyText').innerText = "【系统提示】正在调用API生成下一回合剧情...\n\n(请在设置中配置API以继续生成符合《哈利波特》原著设定的3000字剧情。)";
-        document.getElementById('storyOptions').innerHTML = `<button class="btn" onclick="alert('请先配置API')">等待剧情生成...</button>`;
-    }
-
-    // --- 背包系统 ---
-    function renderInventory() {
-        const list = document.getElementById('inventoryList');
-        list.innerHTML = '';
-        gameState.inventory.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'list-item';
-            div.innerHTML = `<span>${item.name}</span> <span style="color:gray;">x${item.amount}</span>`;
-            div.onclick = () => showItem(item.id);
-            list.appendChild(div);
-        });
     }
 
     function showItem(id) {
@@ -1043,25 +1100,20 @@ c.多人交互对话
         openModal(item.name, content, action);
     }
 
+    // --- 背包物品使用 (直接增加属性) ---
     function useItem(id) {
         const item = gameState.inventory.find(i => i.id === id);
         if(item && item.amount > 0) {
+            item.amount--;
+            if(item.amount <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i.id !== id);
+            }
+            // 直接将物品效果追加到主控的特殊天赋/状态中
+            gameState.main.special = (gameState.main.special || "") + `\n[物品增益] ${item.name}: ${item.effect}`;
+            updateUI();
             closeModal();
-            alert(`【物品交互触发】\n你使用了 ${item.name}！\n效果: ${item.effect}\n(已记录至日常互动日志)`);
+            alert(`使用了 ${item.name}！\n效果已直接附加至主控面板的【特殊天赋】中。`);
         }
-    }
-
-    // --- 社交系统 ---
-    function renderSocial() {
-        const list = document.getElementById('socialList');
-        list.innerHTML = '';
-        gameState.npcs.forEach(npc => {
-            const div = document.createElement('div');
-            div.className = 'list-item';
-            div.innerHTML = `<span>${npc.name}</span> <span style="font-size:12px; color:var(--primary-color);">${npc.house} | 好感:${npc.relation}</span>`;
-            div.onclick = () => showNPC(npc.id);
-            list.appendChild(div);
-        });
     }
 
     function showNPC(id) {
@@ -1071,6 +1123,186 @@ c.多人交互对话
         openModal(`🧙‍♂️ ${npc.name}`, content);
     }
 
+    // --- 剧情控制逻辑 (上一周、重新生成) ---
+    function saveHistory() {
+        // 深拷贝当前状态存入历史
+        const currentState = JSON.parse(JSON.stringify({
+            turn: gameState.turn, main: gameState.main, story: gameState.story, 
+            inventory: gameState.inventory, npcs: gameState.npcs
+        }));
+        gameState.history.push(currentState);
+    }
+
+    function prevWeek() {
+        if(gameState.history.length === 0) {
+            alert("已经是第一周，无法回溯！");
+            return;
+        }
+        const lastState = gameState.history.pop();
+        gameState.turn = lastState.turn;
+        gameState.main = lastState.main;
+        gameState.story = lastState.story;
+        gameState.inventory = lastState.inventory;
+        gameState.npcs = lastState.npcs;
+        updateUI();
+        addLog("时间回溯", true, `已回溯至第 ${gameState.turn} 周`);
+    }
+
+    function regenerateWeek() {
+        if(!gameState.lastPrompt) {
+            alert("没有可重新生成的记录！");
+            return;
+        }
+        callAPI(gameState.lastPrompt, true);
+    }
+
+    function startGame() {
+        if(gameState.turn > 0) {
+            if(!confirm("当前已有游戏进度，确定要重新开启人生吗？")) return;
+        }
+        gameState.turn = 1;
+        gameState.history = [];
+        callAPI("请根据设定随机生成初始身份（11岁，等待入学通知书），并开始第一周。请生成不少于3000字的细腻剧情。");
+        switchTab('story', document.querySelectorAll('.nav-item')[1]);
+    }
+
+    function selectOption(optText) {
+        saveHistory();
+        gameState.turn++;
+        callAPI(`我选择了选项：【${optText}】。请推进下一周，生成不少于3000字的剧情，并更新我的主控面板、背包和社交状态。`);
+    }
+
+    function submitCustomAction() {
+        const input = document.getElementById('customActionInput');
+        const action = input.value.trim();
+        if(!action) {
+            alert("请输入行动内容！");
+            return;
+        }
+        input.value = '';
+        saveHistory();
+        gameState.turn++;
+        callAPI(`我自主决定采取行动：【${action}】。请根据我的行动推进下一周，生成不少于3000字的剧情，并更新状态。`);
+    }
+
+    // --- API 调用 (后台生成，不阻塞) ---
+    async function callAPI(userPrompt, isRegenerate = false) {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+
+        if(!url || !key || !model) {
+            alert("请先在【设置】中配置API端口、密钥并拉取选择模型！");
+            switchTab('settings', document.querySelectorAll('.nav-item')[4]);
+            return;
+        }
+
+        gameState.lastPrompt = userPrompt;
+
+        // 局部提示，不使用全屏遮罩
+        document.getElementById('storyText').innerText = "大魔法师正在后台编织命运，请稍候...\n(您可以切换到其他页面查看信息，生成完毕后会自动更新)";
+        document.getElementById('storyOptions').innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">生成中...</div>`;
+
+        // 修改 Prompt：日志正常记录
+        let systemPrompt = `你是一个完全符合《哈利波特》原著设定的文字养成游戏引擎。
+请严格遵守以下核心设定：
+${coreReferenceText}
+
+玩家当前人设：
+${gameState.characterLore || "无"}
+
+玩家导入的预设规则：
+${gameState.presets.map(p => p.name + ":\n" + p.content).join('\n\n') || "无"}
+
+当前游戏状态（JSON）：
+${JSON.stringify(gameState.main)}
+背包：${JSON.stringify(gameState.inventory)}
+社交：${JSON.stringify(gameState.npcs)}
+
+【重要输出要求】
+你必须且只能输出一个合法的JSON对象，不要包含任何Markdown标记（如 \`\`\`json ），不要有任何前言后语。JSON格式必须严格如下：
+{
+  "main": {
+    "era": "时代背景", "time": "当前时间", "location": "当前地点", "weather": "天气", "news": "热点事件",
+    "name": "姓名", "blood": "血统", "age": "年龄", "appearance": "外貌", "family": "家族", "assets": "资产",
+    "wand": "魔杖", "talent": "天赋", "special": "特殊", "record": "档案",
+    "log": "周日常互动日志(正常文本记录，不要伪代码)"
+  },
+  "story": {
+    "text": "本周的剧情描述，必须严格≥3000字，包含细腻的环境、心理、对话描写。",
+    "options": ["选项1", "选项2", "选项3", "选项4", "选项5"]
+  },
+  "inventory": [
+    {"id": 1, "name": "物品名", "desc": "描述", "effect": "效果", "amount": 1}
+  ],
+  "npcs": [
+    {"id": 1, "name": "NPC名", "house": "学院", "relation": 50, "desc": "描述"}
+  ]
+}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${key}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt }
+                    ],
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim();
+            
+            // 统计 Tokens 和 字数
+            if(data.usage && data.usage.total_tokens) {
+                gameState.stats.totalTokens += data.usage.total_tokens;
+            }
+            gameState.stats.totalChars += replyText.length;
+
+            // 清理 markdown 标记
+            if(replyText.startsWith("```json")) replyText = replyText.replace(/^```json/, '');
+            if(replyText.startsWith("```")) replyText = replyText.replace(/^```/, '');
+            if(replyText.endsWith("```")) replyText = replyText.replace(/```$/, '');
+            replyText = replyText.trim();
+
+            try {
+                const parsedData = JSON.parse(replyText);
+                if(parsedData.main) gameState.main = parsedData.main;
+                if(parsedData.story) gameState.story = parsedData.story;
+                if(parsedData.inventory) gameState.inventory = parsedData.inventory;
+                if(parsedData.npcs) gameState.npcs = parsedData.npcs;
+                
+                updateUI();
+                addLog("API调用", true, `成功生成第 ${gameState.turn} 周内容`);
+                
+                // 如果用户切到了其他页面，给个小提示
+                if(!document.getElementById('view-story').classList.contains('active')) {
+                    alert("✨ 新一周的命运已编织完毕，请前往【剧情】页面查看！");
+                }
+            } catch (parseErr) {
+                console.error("JSON解析失败:", replyText);
+                gameState.story.text = "【系统警告：大模型未返回标准JSON格式，以下为原始文本】\n\n" + replyText;
+                gameState.story.options = [];
+                updateUI();
+                addLog("API调用", false, "JSON解析失败，已降级显示纯文本");
+            }
+
+        } catch (error) {
+            gameState.story.text = "生成失败：" + error.message;
+            updateUI();
+            addLog("API调用", false, error.message);
+        }
+    }
+		
     // --- 设置与主题系统 ---
     function toggleDarkMode() {
         const isDark = document.getElementById('darkModeToggle').checked;
@@ -1103,13 +1335,14 @@ c.多人交互对话
         gameState.characterLore = document.getElementById('characterLore').value;
         gameState.settings.apiUrl = document.getElementById('apiUrl').value;
         gameState.settings.apiKey = document.getElementById('apiKey').value;
+        gameState.settings.apiModel = document.getElementById('apiModel').value;
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gameState));
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", "hogwarts_save.json");
         dlAnchorElem.click();
-        addLog("存档导出", true, "成功导出 hogwarts_save.json");
+        addLog("存档导出", true, "成功导出");
     }
 
     function importSave(event) {
@@ -1120,13 +1353,18 @@ c.多人交互对话
             try {
                 gameState = JSON.parse(e.target.result);
                 applySettings();
-                renderStory();
-                renderInventory();
-                renderSocial();
+                updateUI();
                 renderPresets();
                 document.getElementById('characterLore').value = gameState.characterLore || "";
                 document.getElementById('apiUrl').value = gameState.settings.apiUrl || "";
                 document.getElementById('apiKey').value = gameState.settings.apiKey || "";
+                
+                // 恢复模型选择
+                if(gameState.settings.apiModel) {
+                    const select = document.getElementById('apiModel');
+                    select.innerHTML = `<option value="${gameState.settings.apiModel}">${gameState.settings.apiModel}</option>`;
+                }
+                
                 alert("存档导入成功！");
                 addLog("存档导入", true, "成功加载存档");
             } catch (err) {
@@ -1196,7 +1434,7 @@ c.多人交互对话
         renderPresets();
     }
 
-    // --- API 系统 ---
+    // --- API 模型拉取 ---
     function addLog(action, success, detail) {
         const logBox = document.getElementById('apiLog');
         const time = new Date().toLocaleTimeString();
@@ -1241,6 +1479,12 @@ c.多人交互对话
                     opt.innerText = model.id;
                     select.appendChild(opt);
                 });
+                // 默认选中第一个
+                if(data.data.length > 0) {
+                    gameState.settings.apiModel = data.data[0].id;
+                }
+                select.onchange = (e) => { gameState.settings.apiModel = e.target.value; };
+                
                 addLog("拉取模型", true, `成功获取 ${data.data.length} 个模型`);
             } else {
                 throw new Error("返回数据格式不符合OpenAI规范");
