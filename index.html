@@ -14,6 +14,8 @@
             --primary-color: #000000; 
             --nav-bg: #ffffff;
             --shadow: 0 4px 12px rgba(0,0,0,0.05);
+            --app-width: 390px;
+            --app-height: 844px;
         }
 
         [data-theme="dark"] {
@@ -36,10 +38,10 @@
             overflow: hidden;
         }
 
-        /* 手机屏幕容器 */
+        /* 手机屏幕容器 (弹性布局，防止超出) */
         #app {
-            width: 390px; /* 严格匹配 iPhone 12 宽度 */
-            height: 844px; /* 严格匹配 iPhone 12 高度 */
+            width: var(--app-width);
+            height: var(--app-height);
             background-color: var(--bg-color);
             color: var(--text-color);
             position: relative;
@@ -63,6 +65,7 @@
             letter-spacing: 2px;
             z-index: 10;
             position: relative;
+            flex-shrink: 0;
         }
         
         .header-btn {
@@ -82,7 +85,6 @@
             flex: 1;
             overflow-y: auto;
             padding: 15px;
-            padding-bottom: 70px; 
         }
 
         .view { display: none; animation: fadeIn 0.3s; }
@@ -127,8 +129,6 @@
 
         /* 底部导航栏 */
         .nav-bar {
-            position: absolute;
-            bottom: 0;
             width: 100%;
             height: 60px;
             background-color: var(--nav-bg);
@@ -137,6 +137,7 @@
             justify-content: space-around;
             align-items: center;
             z-index: 10;
+            flex-shrink: 0;
         }
         .nav-item {
             display: flex;
@@ -176,7 +177,7 @@
         /* 设置面板专用样式 */
         .settings-group { margin-bottom: 20px; }
         .settings-group h4 { margin-bottom: 10px; color: var(--primary-color); }
-        input[type="text"], input[type="password"], select, textarea {
+        input[type="text"], input[type="password"], input[type="number"], select, textarea {
             width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border-color);
             border-radius: 4px; background: var(--card-bg); color: var(--text-color);
         }
@@ -198,18 +199,6 @@
         }
         .custom-option-area input { margin-bottom: 0; flex: 1; }
         .custom-option-area button { width: auto; margin-bottom: 0; white-space: nowrap; }
-        
-        /* Loading 遮罩 */
-        #loadingOverlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 200;
-            color: white; flex-direction: column; font-weight: bold;
-        }
-        .spinner {
-            border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff;
-            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -259,9 +248,10 @@
         <!-- 剧情界面 -->
         <div id="view-story" class="view">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
-                <button class="btn btn-outline" onclick="prevWeek()" style="width: auto; padding: 4px 8px; margin: 0;">◀ 上一周</button>
-                <span style="font-weight: bold; font-size: 14px; color: var(--primary-color);" id="story-time">第 0 周 | 待开启</span>
-                <button class="btn btn-outline" onclick="regenerateWeek()" style="width: auto; padding: 4px 8px; margin: 0;">重新生成 ↻</button>
+                <button class="btn btn-outline" onclick="prevWeek()" style="width: auto; padding: 4px 8px; margin: 0; font-size: 12px;">◀ 上周</button>
+                <button class="btn btn-outline" onclick="nextWeek()" style="width: auto; padding: 4px 8px; margin: 0; font-size: 12px;">下周 ▶</button>
+                <span style="font-weight: bold; font-size: 14px; color: var(--primary-color); cursor: pointer; text-decoration: underline;" onclick="openCalendar()" id="story-time">第 0 周 📅</span>
+                <button class="btn btn-outline" onclick="regenerateWeek()" style="width: auto; padding: 4px 8px; margin: 0; font-size: 12px;">重生 ↻</button>
             </div>
             
             <div class="card">
@@ -324,13 +314,32 @@
                 </div>
             </div>
 
-            <!-- 存档管理 -->
+            <!-- 屏幕比例设置 -->
+            <div class="card settings-group">
+                <h4>📱 屏幕比例</h4>
+                <div style="margin-bottom: 10px; font-size: 12px; color: gray;" id="currentResolutionText">当前比例: 390x844px</div>
+                <select id="resolutionSelect" onchange="changeResolution()">
+                    <option value="390x844">iPhone 12/13/14 (390x844)</option>
+                    <option value="375x812">iPhone SE/X/11 Pro (375x812)</option>
+                    <option value="430x932">iPhone 14 Pro Max (430x932)</option>
+                    <option value="360x800">Android 经典 (360x800)</option>
+                    <option value="custom">自定义比例...</option>
+                </select>
+                <div id="customResolutionDiv" style="display: none; display: flex; gap: 10px; margin-top: 10px;">
+                    <input type="number" id="customWidth" placeholder="宽(px)" style="flex: 1; margin-bottom: 0;">
+                    <input type="number" id="customHeight" placeholder="高(px)" style="flex: 1; margin-bottom: 0;">
+                    <button class="btn btn-outline" style="width: auto; margin-bottom: 0;" onclick="applyCustomResolution()">应用</button>
+                </div>
+            </div>
+
+                 <!-- 存档管理 -->
             <div class="card settings-group">
                 <h4>💾 存档管理</h4>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-outline" style="flex: 1;" onclick="exportSave()">导出存档 (JSON)</button>
-                    <button class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('importSave').click()">导入存档</button>
-                    <input type="file" id="importSave" accept=".json" style="display: none;" onchange="importSave(event)">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-outline" style="flex: 1; min-width: 45%;" onclick="exportSave()">导出 (JSON)</button>
+                    <button class="btn btn-outline" style="flex: 1; min-width: 45%;" onclick="exportSaveTXT()">导出 (TXT)</button>
+                    <button class="btn btn-outline" style="flex: 1; min-width: 100%;" onclick="document.getElementById('importSave').click()">导入存档 (支持 JSON/TXT)</button>
+                    <input type="file" id="importSave" accept=".json,.txt" style="display: none;" onchange="importSave(event)">
                 </div>
             </div>
 
@@ -372,10 +381,9 @@
                 </select>
                 <h5 style="margin: 10px 0 5px 0;">API 调用日志</h5>
                 <div class="log-box" id="apiLog"></div>
-                </div>
-						</div>
-						
-						<!-- 数据统计 -->
+            </div>
+
+            <!-- 数据统计 -->
             <div class="card settings-group">
                 <h4>📊 游玩统计</h4>
                 <div class="info-row"><span class="info-label">消耗 Tokens</span><span class="info-value" id="stat-tokens">0</span></div>
@@ -412,12 +420,6 @@
                 <button class="btn btn-outline" style="width: auto;" onclick="closeModal()">关闭</button>
             </div>
         </div>
-    </div>
-    
-    <!-- Loading 遮罩 -->
-    <div id="loadingOverlay">
-        <div class="spinner"></div>
-        <div id="loadingText">猫头鹰正在送信中...</div>
     </div>
 </div>
 
@@ -955,14 +957,15 @@ c.多人交互对话
 2.添加边框和颜色美化界面，优化排版。
 3.关键节点用>分隔，避免横向滑动，行距加倍清爽。
 重点！！！
-以上所有文档内容和补充内容都必须存档录入！必须存档录入！重点标红！）`;
+以上所有文档内容和补充内容都必须存档录入！必须存档录入！重点标红！`;
 
-        // --- 游戏核心数据状态 (初始全空) ---
+    // --- 游戏核心数据状态 (初始全空) ---
     let gameState = {
         turn: 0,
-        history: [], // 用于保存历史记录以实现回溯
-        lastPrompt: "", // 记录上一次的请求，用于重新生成
-        stats: { totalTokens: 0, totalChars: 0 }, // 统计数据
+        maxTurn: 0,
+        history: [], 
+        lastPrompt: "", 
+        stats: { totalTokens: 0, totalChars: 0 }, 
         characterLore: "",
         presets: [], 
         main: {
@@ -981,7 +984,8 @@ c.多人交互对话
             primaryColor: "#000000",
             apiUrl: "https://api.openai.com",
             apiKey: "",
-            apiModel: ""
+            apiModel: "",
+            resolution: { width: 390, height: 844 }
         }
     };
 
@@ -995,7 +999,7 @@ c.多人交互对话
         document.getElementById('apiKey').value = gameState.settings.apiKey;
         renderPresets();
     };
-    
+
     // --- UI 更新逻辑 ---
     function updateUI() {
         // 更新主控
@@ -1018,7 +1022,7 @@ c.多人交互对话
         document.getElementById('mc-log').innerText = m.log || "暂无日志...";
 
         // 更新剧情 (改为周)
-        document.getElementById('story-time').innerText = `第 ${gameState.turn} 周`;
+        document.getElementById('story-time').innerText = `第 ${gameState.turn} 周 📅`;
         if(gameState.story.text) {
             document.getElementById('storyText').innerText = gameState.story.text;
         }
@@ -1081,7 +1085,7 @@ c.多人交互对话
 
     function openModal(title, content, actionsHtml = '') {
         document.getElementById('modalTitle').innerText = title;
-        document.getElementById('modalContent').innerText = content;
+        document.getElementById('modalContent').innerHTML = content;
         let defaultAction = `<button class="btn btn-outline" style="width:auto;" onclick="closeModal()">关闭</button>`;
         document.getElementById('modalActions').innerHTML = actionsHtml + defaultAction;
         document.getElementById('commonModal').style.display = 'flex';
@@ -1089,6 +1093,7 @@ c.多人交互对话
 
     function closeModal() {
         document.getElementById('commonModal').style.display = 'none';
+        document.getElementById('modalContent').style.display = 'block';
     }
 
     function showItem(id) {
@@ -1107,7 +1112,6 @@ c.多人交互对话
             if(item.amount <= 0) {
                 gameState.inventory = gameState.inventory.filter(i => i.id !== id);
             }
-            // 直接将物品效果追加到主控的特殊天赋/状态中
             gameState.main.special = (gameState.main.special || "") + `\n[物品增益] ${item.name}: ${item.effect}`;
             updateUI();
             closeModal();
@@ -1122,29 +1126,75 @@ c.多人交互对话
         openModal(`🧙‍♂️ ${npc.name}`, content);
     }
 
-    // --- 剧情控制逻辑 (上一周、重新生成) ---
-    function saveHistory() {
-        // 深拷贝当前状态存入历史
-        const currentState = JSON.parse(JSON.stringify({
-            turn: gameState.turn, main: gameState.main, story: gameState.story, 
-            inventory: gameState.inventory, npcs: gameState.npcs
-        }));
-        gameState.history.push(currentState);
+    // --- 剧情控制逻辑 (上一周、下一周、日历、重新生成) ---
+    function saveCurrentToHistory() {
+        if (gameState.turn > 0) {
+            gameState.history[gameState.turn - 1] = JSON.parse(JSON.stringify({
+                main: gameState.main,
+                story: gameState.story,
+                inventory: gameState.inventory,
+                npcs: gameState.npcs
+            }));
+        }
+    }
+
+    function loadFromHistory(targetTurn) {
+        const state = gameState.history[targetTurn - 1];
+        if (state) {
+            gameState.main = JSON.parse(JSON.stringify(state.main));
+            gameState.story = JSON.parse(JSON.stringify(state.story));
+            gameState.inventory = JSON.parse(JSON.stringify(state.inventory));
+            gameState.npcs = JSON.parse(JSON.stringify(state.npcs));
+        }
     }
 
     function prevWeek() {
-        if(gameState.history.length === 0) {
-            alert("已经是第一周，无法回溯！");
+        if(gameState.turn <= 1) {
+            alert("已经是第一周了！");
             return;
         }
-        const lastState = gameState.history.pop();
-        gameState.turn = lastState.turn;
-        gameState.main = lastState.main;
-        gameState.story = lastState.story;
-        gameState.inventory = lastState.inventory;
-        gameState.npcs = lastState.npcs;
+        saveCurrentToHistory();
+        gameState.turn--;
+        loadFromHistory(gameState.turn);
         updateUI();
-        addLog("时间回溯", true, `已回溯至第 ${gameState.turn} 周`);
+    }
+
+    function nextWeek() {
+        if(!gameState.maxTurn || gameState.turn >= gameState.maxTurn) {
+            alert("已经是最新一周了！");
+            return;
+        }
+        saveCurrentToHistory();
+        gameState.turn++;
+        loadFromHistory(gameState.turn);
+        updateUI();
+    }
+
+    function openCalendar() {
+        if (gameState.turn === 0) {
+            alert("请先开启人生！");
+            return;
+        }
+        saveCurrentToHistory();
+        let html = '<div style="display:flex; flex-direction:column; gap:10px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">';
+        const max = gameState.maxTurn || gameState.turn;
+        for (let i = 1; i <= max; i++) {
+            const isCurrent = (i === gameState.turn) ? 'background-color: var(--primary-color); color: white;' : '';
+            html += `<button class="btn btn-outline" style="margin:0; ${isCurrent}" onclick="jumpToWeek(${i})">第 ${i} 周</button>`;
+        }
+        html += '</div>';
+        document.getElementById('modalContent').style.display = 'none'; 
+        openModal("📅 霍格沃茨日历", "", html);
+        document.getElementById('modalContent').style.display = 'block'; // 恢复显示
+    }
+
+    function jumpToWeek(targetTurn) {
+        closeModal();
+        if (targetTurn === gameState.turn) return;
+        saveCurrentToHistory();
+        gameState.turn = targetTurn;
+        loadFromHistory(gameState.turn);
+        updateUI();
     }
 
     function regenerateWeek() {
@@ -1159,15 +1209,17 @@ c.多人交互对话
         if(gameState.turn > 0) {
             if(!confirm("当前已有游戏进度，确定要重新开启人生吗？")) return;
         }
-        gameState.turn = 1;
+        gameState.turn = 0;
+        gameState.maxTurn = 0;
         gameState.history = [];
         callAPI("请根据设定随机生成初始身份（11岁，等待入学通知书），并开始第一周。请生成不少于3000字的细腻剧情。");
         switchTab('story', document.querySelectorAll('.nav-item')[1]);
     }
 
     function selectOption(optText) {
-        saveHistory();
-        gameState.turn++;
+        saveCurrentToHistory();
+        gameState.history.length = gameState.turn; 
+        gameState.maxTurn = gameState.turn;
         callAPI(`我选择了选项：【${optText}】。请推进下一周，生成不少于3000字的剧情，并更新我的主控面板、背包和社交状态。`);
     }
 
@@ -1179,8 +1231,9 @@ c.多人交互对话
             return;
         }
         input.value = '';
-        saveHistory();
-        gameState.turn++;
+        saveCurrentToHistory();
+        gameState.history.length = gameState.turn; 
+        gameState.maxTurn = gameState.turn;
         callAPI(`我自主决定采取行动：【${action}】。请根据我的行动推进下一周，生成不少于3000字的剧情，并更新状态。`);
     }
 
@@ -1198,11 +1251,9 @@ c.多人交互对话
 
         gameState.lastPrompt = userPrompt;
 
-        // 局部提示，不使用全屏遮罩
         document.getElementById('storyText').innerText = "大魔法师正在后台编织命运，请稍候...\n(您可以切换到其他页面查看信息，生成完毕后会自动更新)";
         document.getElementById('storyOptions').innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">生成中...</div>`;
 
-        // 修改 Prompt：日志正常记录
         let systemPrompt = `你是一个完全符合《哈利波特》原著设定的文字养成游戏引擎。
 请严格遵守以下核心设定：
 ${coreReferenceText}
@@ -1261,13 +1312,11 @@ ${JSON.stringify(gameState.main)}
             const data = await response.json();
             let replyText = data.choices[0].message.content.trim();
             
-            // 统计 Tokens 和 字数
             if(data.usage && data.usage.total_tokens) {
                 gameState.stats.totalTokens += data.usage.total_tokens;
             }
             gameState.stats.totalChars += replyText.length;
 
-            // 清理 markdown 标记
             if(replyText.startsWith("```json")) replyText = replyText.replace(/^```json/, '');
             if(replyText.startsWith("```")) replyText = replyText.replace(/^```/, '');
             if(replyText.endsWith("```")) replyText = replyText.replace(/```$/, '');
@@ -1280,10 +1329,15 @@ ${JSON.stringify(gameState.main)}
                 if(parsedData.inventory) gameState.inventory = parsedData.inventory;
                 if(parsedData.npcs) gameState.npcs = parsedData.npcs;
                 
+                if (!isRegenerate) {
+                    gameState.turn++;
+                    gameState.maxTurn = gameState.turn;
+                }
+                saveCurrentToHistory(); 
+                
                 updateUI();
                 addLog("API调用", true, `成功生成第 ${gameState.turn} 周内容`);
                 
-                // 如果用户切到了其他页面，给个小提示
                 if(!document.getElementById('view-story').classList.contains('active')) {
                     alert("✨ 新一周的命运已编织完毕，请前往【剧情】页面查看！");
                 }
@@ -1301,7 +1355,7 @@ ${JSON.stringify(gameState.main)}
             addLog("API调用", false, error.message);
         }
     }
-		
+
     // --- 设置与主题系统 ---
     function toggleDarkMode() {
         const isDark = document.getElementById('darkModeToggle').checked;
@@ -1318,6 +1372,30 @@ ${JSON.stringify(gameState.main)}
         applySettings();
     }
 
+    function changeResolution() {
+        const val = document.getElementById('resolutionSelect').value;
+        const customDiv = document.getElementById('customResolutionDiv');
+        if (val === 'custom') {
+            customDiv.style.display = 'flex';
+        } else {
+            customDiv.style.display = 'none';
+            const [w, h] = val.split('x');
+            gameState.settings.resolution = { width: parseInt(w), height: parseInt(h) };
+            applySettings();
+        }
+    }
+
+    function applyCustomResolution() {
+        const w = parseInt(document.getElementById('customWidth').value);
+        const h = parseInt(document.getElementById('customHeight').value);
+        if (w >= 300 && h >= 400) {
+            gameState.settings.resolution = { width: w, height: h };
+            applySettings();
+        } else {
+            alert("请输入合理的宽高数值 (宽>=300, 高>=400)");
+        }
+    }
+
     function applySettings() {
         if (gameState.settings.theme === 'dark') {
             document.body.setAttribute('data-theme', 'dark');
@@ -1327,6 +1405,33 @@ ${JSON.stringify(gameState.main)}
             document.getElementById('darkModeToggle').checked = false;
         }
         document.documentElement.style.setProperty('--primary-color', gameState.settings.primaryColor);
+        
+        if (!gameState.settings.resolution) {
+            gameState.settings.resolution = { width: 390, height: 844 };
+        }
+        const res = gameState.settings.resolution;
+        document.documentElement.style.setProperty('--app-width', `${res.width}px`);
+        document.documentElement.style.setProperty('--app-height', `${res.height}px`);
+        
+        const resText = document.getElementById('currentResolutionText');
+        if (resText) {
+            resText.innerText = `当前比例: ${res.width}x${res.height}px`;
+        }
+        
+        const select = document.getElementById('resolutionSelect');
+        if (select) {
+            const valStr = `${res.width}x${res.height}`;
+            let found = false;
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === valStr) {
+                    select.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) select.value = 'custom';
+            document.getElementById('customResolutionDiv').style.display = found ? 'none' : 'flex';
+        }
     }
 
     // --- 存档系统 ---
@@ -1337,7 +1442,6 @@ ${JSON.stringify(gameState.main)}
         gameState.settings.apiModel = document.getElementById('apiModel').value;
 
         try {
-            // 使用 Blob 替代 data URI，防止文件过大导致截断和解析错误
             const jsonString = JSON.stringify(gameState);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -1349,10 +1453,35 @@ ${JSON.stringify(gameState.main)}
             dlAnchorElem.click();
             document.body.removeChild(dlAnchorElem);
             
-            // 释放内存
             URL.revokeObjectURL(url); 
+            addLog("存档导出", true, "成功导出 JSON");
+        } catch (error) {
+            alert("导出失败：" + error.message);
+            addLog("存档导出", false, error.message);
+        }
+    }
+
+    function exportSaveTXT() {
+        gameState.characterLore = document.getElementById('characterLore').value;
+        gameState.settings.apiUrl = document.getElementById('apiUrl').value;
+        gameState.settings.apiKey = document.getElementById('apiKey').value;
+        gameState.settings.apiModel = document.getElementById('apiModel').value;
+
+        try {
+            // 使用 null, 4 进行格式化缩进，方便在 TXT 中阅读和手动修改
+            const jsonString = JSON.stringify(gameState, null, 4);
+            const blob = new Blob([jsonString], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
             
-            addLog("存档导出", true, "成功导出");
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.href = url;
+            dlAnchorElem.download = "hogwarts_save.txt";
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            document.body.removeChild(dlAnchorElem);
+            
+            URL.revokeObjectURL(url); 
+            addLog("存档导出", true, "成功导出 TXT");
         } catch (error) {
             alert("导出失败：" + error.message);
             addLog("存档导出", false, error.message);
@@ -1373,7 +1502,6 @@ ${JSON.stringify(gameState.main)}
                 document.getElementById('apiUrl').value = gameState.settings.apiUrl || "";
                 document.getElementById('apiKey').value = gameState.settings.apiKey || "";
                 
-                // 恢复模型选择
                 if(gameState.settings.apiModel) {
                     const select = document.getElementById('apiModel');
                     select.innerHTML = `<option value="${gameState.settings.apiModel}">${gameState.settings.apiModel}</option>`;
@@ -1382,11 +1510,13 @@ ${JSON.stringify(gameState.main)}
                 alert("存档导入成功！");
                 addLog("存档导入", true, "成功加载存档");
             } catch (err) {
-                alert("存档文件格式错误！");
+                alert("存档文件格式错误！请确保修改 TXT 时没有破坏 JSON 括号结构。");
                 addLog("存档导入", false, "JSON解析失败");
             }
         };
         reader.readAsText(file);
+        // 清空 input value 以便重复导入同一个文件
+        event.target.value = '';
     }
 
     // --- 设定管理 ---
@@ -1493,7 +1623,6 @@ ${JSON.stringify(gameState.main)}
                     opt.innerText = model.id;
                     select.appendChild(opt);
                 });
-                // 默认选中第一个
                 if(data.data.length > 0) {
                     gameState.settings.apiModel = data.data[0].id;
                 }
