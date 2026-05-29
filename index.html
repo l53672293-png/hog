@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>霍格沃茨模拟器</title>
+    <!-- PWA 桌面安装与全屏适配 Meta 标签 -->
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="霍格沃茨">
     <style>
         /* 基础与主题变量 */
         :root {
@@ -35,6 +41,2368 @@
             justify-content: center;
             align-items: flex-start;
             height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            padding-top: 10px;
+        }
+
+        /* 手机屏幕容器 */
+        #app {
+            width: var(--app-width);
+            height: var(--app-height);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        /* 顶部标题栏 */
+        .header {
+            height: 50px;
+            background-color: var(--primary-color);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            z-index: 10;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        /* 内容区域 */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .view { display: none; animation: fadeIn 0.3s; }
+        .view.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 卡片样式 */
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--primary-color);
+        }
+        .card-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;}
+        .card-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+        
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; border-bottom: 1px dashed var(--border-color); padding-bottom: 3px;}
+        .info-label { color: gray; flex-shrink: 0; margin-right: 10px;}
+        .info-value { font-weight: bold; text-align: right; word-break: break-all;}
+
+        /* 按钮样式 */
+        .btn {
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            width: 100%;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+        .btn:active { opacity: 0.8; }
+        .btn:disabled { background-color: gray; cursor: not-allowed; }
+        .btn-outline { background: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-align: center;}
+
+        /* 底部导航栏 */
+        .nav-bar {
+            width: 100%;
+            height: 60px;
+            background-color: var(--nav-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: gray;
+            cursor: pointer;
+        }
+        .nav-item.active { color: var(--primary-color); font-weight: bold; }
+        .nav-icon { font-size: 20px; margin-bottom: 2px; }
+
+        /* 列表项交互 */
+        .list-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .list-item:active { background-color: rgba(0,0,0,0.05); }
+
+        /* 模态框 (弹窗) */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal {
+            background: var(--bg-color); width: 94%; max-height: 85%; overflow-y: auto; border-radius: 12px; padding: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid var(--primary-color);
+        }
+        .modal h3 { margin-bottom: 10px; font-size: 16px; }
+        .modal-actions { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+
+        /* 设置面板专用样式 */
+        .settings-group { margin-bottom: 20px; }
+        .settings-group h4 { margin-bottom: 10px; color: var(--primary-color); }
+        input[type="text"], input[type="password"], input[type="number"], select, textarea {
+            width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border-color);
+            border-radius: 4px; background: var(--card-bg); color: var(--text-color);
+        }
+        .color-picker { display: flex; gap: 10px; margin-bottom: 10px; }
+        .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .color-dot.active { border-color: var(--text-color); }
+        .log-box { height: 100px; overflow-y: auto; background: #000; color: #0f0; font-family: monospace; font-size: 12px; padding: 5px; border-radius: 4px; }
+        .log-entry { border-bottom: 1px dashed #333; padding: 2px 0; }
+        
+        .code-block { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; overflow-x: auto; margin-top: 10px; white-space: pre-wrap;}
+        
+        /* 自定义选项输入区 */
+        .custom-option-area {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 10px;
+        }
+        .custom-option-area input { margin-bottom: 0; flex: 1; }
+        .custom-option-area button { width: auto; margin-bottom: 0; white-space: nowrap; }
+
+        /* 属性进度条与成绩样式 */
+        .progress-container { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
+        .progress-label { width: 85px; color: gray; flex-shrink: 0; }
+        .progress-bar-bg { flex: 1; background: var(--border-color); height: 8px; border-radius: 4px; margin: 0 10px; overflow: hidden; }
+        .progress-bar-fill { background: var(--primary-color); height: 100%; transition: width 0.3s; }
+        .progress-value { width: 45px; text-align: right; font-size: 12px; font-weight: bold; }
+        
+        .grade-section { margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
+        .grade-title { font-weight: bold; font-size: 13px; margin-bottom: 8px; color: var(--primary-color); }
+        .grade-grid { display: grid; grid-template-columns: 1fr 1fr; row-gap: 6px; column-gap: 15px; font-size: 12px; }
+        .grade-item { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 2px;}
+        .grade-item span:last-child { font-weight: bold; }
+
+        /* 状态词条样式 */
+        .trait-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin: 2px 4px 2px 0; cursor: pointer; border: 1px solid; }
+        .trait-buff { background: #e6f4ea; color: #006622; border-color: #006622; }
+        .trait-debuff { background: #fce8e6; color: #990000; border-color: #990000; }
+        .trait-neutral { background: #f1f3f4; color: #5f6368; border-color: #5f6368; }
+                /* 社交折叠面板与聊天样式 */
+        .social-category { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+        .social-category-header { padding: 10px; font-weight: bold; background: rgba(0,0,0,0.05); cursor: pointer; display: flex; justify-content: space-between; font-size: 14px; }
+        .social-category-content { display: none; }
+        .social-category-content.open { display: block; }
+        
+        .chat-box { height: 300px; overflow-y: auto; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+        .chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-all; }
+        .chat-msg.user { align-self: flex-end; background: var(--primary-color); color: white; border-bottom-right-radius: 2px; }
+        .chat-msg.npc { align-self: flex-start; background: #e9ecef; color: black; border-bottom-left-radius: 2px; }
+        .chat-msg.system { align-self: center; background: transparent; color: gray; font-size: 11px; text-align: center; }
+        .chat-redpack { background: #fce8e6; border: 1px solid #f28b82; color: #d93025; padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 10px; margin-top: 5px; align-self: flex-start; max-width: 85%;}
+        .chat-redpack-icon { font-size: 24px; }
+        
+        .pet-status-bar { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
+        .pet-status-label { width: 40px; color: gray; }
+        .pet-status-bg { flex: 1; height: 6px; background: var(--border-color); border-radius: 3px; margin: 0 10px; overflow: hidden; }
+        .pet-status-fill { height: 100%; background: var(--primary-color); transition: width 0.3s; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="header" id="headerTitle">
+        霍格沃茨模拟器
+    </div>
+
+    <div class="content">
+        <!-- 主控界面 -->
+        <div id="view-main" class="view active">
+            <div class="card">
+                <div class="card-title">🌍 时代背景与环境</div>
+                <div class="info-row"><span class="info-label">时代背景</span><span class="info-value" id="mc-era">待生成...</span></div>
+                <div class="info-row"><span class="info-label">当前时间</span><span class="info-value" id="mc-time">待生成...</span></div>
+                <div class="info-row"><span class="info-label">当前地点</span><span class="info-value" id="mc-location">待生成...</span></div>
+                <div class="info-row"><span class="info-label">天气情况</span><span class="info-value" id="mc-weather">待生成...</span></div>
+                <div class="info-row"><span class="info-label">热点事件</span><span class="info-value" id="mc-news">待生成...</span></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🧙‍♂️ 巫师档案</div>
+                <div class="info-row"><span class="info-label">姓名</span><span class="info-value" id="mc-name">待生成...</span></div>
+                <div class="info-row"><span class="info-label">血统</span><span class="info-value" id="mc-blood">待生成...</span></div>
+                <div class="info-row"><span class="info-label">年龄</span><span class="info-value" id="mc-age">待生成...</span></div>
+                <div class="info-row"><span class="info-label">外貌特征</span><span class="info-value" id="mc-appearance">待生成...</span></div>
+                <div class="info-row"><span class="info-label">家族立场</span><span class="info-value" id="mc-family">待生成...</span></div>
+                <div class="info-row"><span class="info-label">资产状况</span><span class="info-value" id="mc-assets">待生成...</span></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">✨ 魔法能力与档案</div>
+                <div class="info-row"><span class="info-label">魔杖</span><span class="info-value" id="mc-wand">待生成...</span></div>
+                <div class="info-row"><span class="info-label">魔法天赋</span><span class="info-value" id="mc-talent">待生成...</span></div>
+                <div class="info-row"><span class="info-label">特殊天赋</span><span class="info-value" id="mc-special">待生成...</span></div>
+                <div class="info-row"><span class="info-label">魔法部档案</span><span class="info-value" id="mc-record">待生成...</span></div>
+                
+                <!-- 魔法分类 -->
+                <div class="grade-section">
+                    <div class="grade-title">🪄 魔法能力</div>
+                    <div id="attributes-container">待生成...</div>
+                </div>
+
+                <!-- 状态分类 -->
+                <div class="grade-section">
+                    <div class="grade-title">❤️ 个人状态 (0-100)</div>
+                    <div id="status-container">待生成...</div>
+                    <div id="traits-container" style="margin-top: 8px;"></div>
+                </div>
+
+                <!-- 成绩单 -->
+                <div class="grade-section">
+                    <div class="grade-title">📜 学业成绩 (O-E-A-P-D-T)</div>
+                    <div id="grades-container">待生成...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📅 周日常互动日志</div>
+                <div class="code-block" id="mc-log">暂无日志...</div>
+            </div>
+        </div>
+
+        <!-- 剧情界面 -->
+        <div id="view-story" class="view">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
+                <button class="btn btn-outline" onclick="prevWeek()" style="width: auto; padding: 4px 8px; margin: 0; font-size: 12px;">◀ 上周</button>
+                <button class="btn btn-outline" onclick="nextWeek()" style="width: auto; padding: 4px 8px; margin: 0; font-size: 12px;">下周 ▶</button>
+                <span style="font-weight: bold; font-size: 14px; color: var(--primary-color); cursor: pointer; text-decoration: underline;" onclick="openCalendar()" id="story-time">第 0 周 📅</span>
+                <button class="btn btn-outline" onclick="regenerateWeek()" style="width: auto; padding: 4px 8px; margin: 0; font-size: 12px;">重生 ↻</button>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">📜 剧情事件</div>
+                <div class="card-text" id="storyText" style="height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; background: var(--bg-color);">
+                    请前往【设置】页面最底部，点击【✨ 开启人生】开始你的霍格沃茨之旅...
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🎯 抉择时刻</div>
+                <div id="storyOptions">
+                    <div style="color:gray; text-align:center; font-size:12px;">暂无选项</div>
+                </div>
+                <!-- 自定义选项区 -->
+                <div class="custom-option-area">
+                    <input type="text" id="customActionInput" placeholder="自主填写你的行动...">
+                    <button class="btn btn-outline" onclick="submitCustomAction()">提交</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地图界面 -->
+        <div id="view-map" class="view">
+            <div class="card">
+                <div class="card-title">🗺️ 魔法地图</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                    <button class="btn btn-outline" style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 16px; margin: 0;" onclick="alert('霍格沃茨内部地图探索功能开发中...')">
+                        <span style="font-size: 30px; margin-bottom: 10px;">🏰</span>霍格沃茨
+                    </button>
+                    <button class="btn btn-outline" style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 16px; margin: 0;" onclick="openHogsmeade()">
+                        <span style="font-size: 30px; margin-bottom: 10px;">🍻</span>霍格莫德
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 背包界面 -->
+        <div id="view-inventory" class="view">
+            <div class="card">
+                <div class="card-title">🎒 物品栏 (交互触发)</div>
+                <div id="inventoryList">
+                    <div style="color:gray; text-align:center; font-size:12px; padding:10px;">空空如也</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 社交界面 -->
+        <div id="view-social" class="view">
+            <div class="card">
+                <div class="card-title">🦉 巫师通讯录</div>
+                <div id="socialList">
+                    <div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设置界面 -->
+        <div id="view-settings" class="view">
+            <!-- 主题设置 -->
+            <div class="card settings-group">
+                <h4>🎨 主题设置</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span>深色模式</span>
+                    <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()" style="width: 20px; height: 20px;">
+                </div>
+                <span>主色调预设：</span>
+                <div class="color-picker">
+                    <div class="color-dot" style="background: #000000;" onclick="setPrimaryColor('#000000', this)"></div>
+                    <div class="color-dot" style="background: #990000;" onclick="setPrimaryColor('#990000', this)"></div>
+                    <div class="color-dot" style="background: #009966;" onclick="setPrimaryColor('#009966', this)"></div>
+                    <div class="color-dot" style="background: #CC9900;" onclick="setPrimaryColor('#CC9900', this)"></div>
+                    <div class="color-dot" style="background: #000099;" onclick="setPrimaryColor('#000099', this)"></div>
+                    <input type="color" id="customColor" onchange="setPrimaryColor(this.value, null)" style="width: 30px; height: 30px; padding: 0; border: none;">
+                </div>
+            </div>
+
+            <!-- 屏幕比例设置 -->
+            <div class="card settings-group">
+                <h4>📱 屏幕比例</h4>
+                <div style="margin-bottom: 10px; font-size: 12px; color: gray;" id="currentResolutionText">当前比例: 375x550px</div>
+                <select id="resolutionSelect" onchange="changeResolution()">
+                    <option value="375x550">默认 (iPhone 6 网页安全区 375x550)</option>
+                    <option value="390x700">中等比例 (390x700)</option>
+                    <option value="390x844">iPhone 12/13/14 (390x844)</option>
+                    <option value="375x812">iPhone SE/X/11 Pro (375x812)</option>
+                    <option value="430x932">iPhone 14 Pro Max (430x932)</option>
+                    <option value="360x800">Android 经典 (360x800)</option>
+                    <option value="custom">自定义比例...</option>
+                </select>
+                <div id="customResolutionDiv" style="display: none; display: flex; gap: 10px; margin-top: 10px;">
+                    <input type="number" id="customWidth" placeholder="宽(px)" style="flex: 1; margin-bottom: 0;">
+                    <input type="number" id="customHeight" placeholder="高(px)" style="flex: 1; margin-bottom: 0;">
+                    <button class="btn btn-outline" style="width: auto; margin-bottom: 0;" onclick="applyCustomResolution()">应用</button>
+                </div>
+            </div>
+
+            <!-- 存档管理 -->
+            <div class="card settings-group">
+                <h4>💾 存档管理</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-outline" style="flex: 1; min-width: 45%;" onclick="exportSave()">导出 (JSON)</button>
+                    <button class="btn btn-outline" style="flex: 1; min-width: 45%;" onclick="exportSaveTXT()">导出 (TXT)</button>
+                    <button class="btn btn-outline" style="flex: 1; min-width: 100%;" onclick="document.getElementById('importSave').click()">导入存档 (支持 JSON/TXT)</button>
+                    <input type="file" id="importSave" accept=".json,.txt" style="display: none;" onchange="importSave(event)">
+                </div>
+            </div>
+
+            <!-- 设定管理 -->
+            <div class="card settings-group">
+                <h4>📖 设定管理</h4>
+                <select id="settingType" onchange="toggleSettingView()">
+                    <option value="character">人物设定 (人设)</option>
+                    <option value="preset">规则预设 (破限等)</option>
+                    <option value="reference">参考设定 (核心规则)</option>
+                </select>
+                
+                <div id="characterSettingView">
+                    <textarea id="characterLore" rows="4" placeholder="在此编写或粘贴您的人物设定..."></textarea>
+                    <button class="btn btn-outline" onclick="saveCharacterLore()">保存人设</button>
+                </div>
+
+                <div id="presetSettingView" style="display: none;">
+                    <button class="btn btn-outline" onclick="document.getElementById('importPreset').click()" style="width: 100%; margin-bottom: 10px;">+ 导入TXT预设</button>
+                    <input type="file" id="importPreset" accept=".txt" style="display: none;" onchange="importPreset(event)">
+                    <div id="presetList" style="border: 1px solid var(--border-color); border-radius: 4px; padding: 5px; max-height: 150px; overflow-y: auto;">
+                        <!-- 预设列表 -->
+                    </div>
+                </div>
+
+                <div id="referenceSettingView" style="display: none;">
+                    <textarea id="referenceText" rows="10" readonly style="font-size: 12px; background: var(--bg-color);"></textarea>
+                </div>
+            </div>
+
+            <!-- API设置 -->
+            <div class="card settings-group">
+                <h4>⚙️ API 设定</h4>
+                <input type="text" id="apiUrl" placeholder="API 端口 (如: https://api.openai.com)">
+                <input type="password" id="apiKey" placeholder="API 密钥 (Bearer Token)">
+                <button class="btn btn-outline" onclick="fetchModels()" style="width: 100%; margin-bottom: 10px;">拉取可用模型</button>
+                <select id="apiModel">
+                    <option value="">请先拉取模型...</option>
+                </select>
+                <h5 style="margin: 10px 0 5px 0;">API 调用日志</h5>
+                <div class="log-box" id="apiLog"></div>
+            </div>
+
+            <!-- 数据统计 -->
+            <div class="card settings-group">
+                <h4>📊 游玩统计</h4>
+                <div class="info-row"><span class="info-label">消耗 Tokens</span><span class="info-value" id="stat-tokens">0</span></div>
+                <div class="info-row"><span class="info-label">生成字数</span><span class="info-value" id="stat-chars">0</span></div>
+            </div>
+
+            <!-- 游戏控制 -->
+            <div class="card settings-group" style="border-left-color: #990000; margin-bottom: 30px;">
+                <h4>🚀 游戏控制</h4>
+                <button class="btn" style="background-color: #990000; text-align: center; font-size: 16px; padding: 12px; font-weight: bold;" onclick="startGame()">✨ 开启 / 重置人生</button>
+                <div style="font-size: 12px; color: gray; text-align: center; margin-top: 5px;">点击将清空当前进度并重新生成初始身份</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="nav-bar">
+        <div class="nav-item active" onclick="switchTab('main', this)">
+            <div class="nav-icon">🏰</div><span>主控</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('story', this)">
+            <div class="nav-icon">📖</div><span>剧情</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('map', this)">
+            <div class="nav-icon">🗺️</div><span>地图</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('inventory', this)">
+            <div class="nav-icon">🎒</div><span>背包</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('social', this)">
+            <div class="nav-icon">💬</div><span>社交</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('settings', this)">
+            <div class="nav-icon">⚙️</div><span>设置</span>
+        </div>
+    </div>
+
+    <!-- 通用模态框 -->
+    <div class="modal-overlay" id="commonModal">
+        <div class="modal">
+            <h3 id="modalTitle">标题</h3>
+            <div class="card-text" id="modalContent" style="margin-bottom: 15px;">内容</div>
+            <div class="modal-actions" id="modalActions">
+                <button class="btn btn-outline" style="width: auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- PWA 动态注入系统 (支持安装到桌面并全屏运行) ---
+    (function initPWA() {
+        // 1. 动态生成 manifest.json
+        const manifest = {
+            "name": "霍格沃茨：魔法觉醒",
+            "short_name": "霍格沃茨",
+            "start_url": ".",
+            "display": "standalone", // 核心：standalone 表示独立窗口全屏运行，隐藏浏览器地址栏
+            "background_color": "#333333",
+            "theme_color": "#000000",
+            "icons": [{
+                // 使用闪电 Emoji 作为桌面图标
+                "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>",
+                "sizes": "192x192",
+                "type": "image/svg+xml"
+            }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+
+        // 2. 动态生成并注册空的 Service Worker (Chrome 触发安装提示的必需条件)
+        if ('serviceWorker' in navigator) {
+            const swCode = `self.addEventListener('fetch', function(e) {});`;
+            const swBlob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(swBlob);
+            navigator.serviceWorker.register(swUrl).then(() => {
+                console.log('PWA Service Worker 注册成功，支持安装到桌面');
+            }).catch(err => {
+                console.log('PWA 注册失败:', err);
+            });
+        }
+    })();
+
+    // --- 核心参考设定文本注入 ---
+    const coreReferenceText = `玩一个纯文字高自由的霍格沃兹养成的模拟游戏吧。
+这是一个完全符合《哈利波特》原著的的霍格沃兹养成模拟游戏，请严格遵守初始设定，不要平行宇宙，不要时间纠缠，不要量子纠缠，不要时间悖论，不要爱因斯坦环，不要莫比斯乌环，不要宇宙，不要黑洞，不要科幻，不要量子态，不要黑暗，不要魔幻，不要悬疑，不要血腥，不要阴谋，不要黑科技，不要超现实，不要赛博朋克，不要除《哈利波特》原著中背景和设定外的各种术语，禁止所有不符合《哈利波特》原著的背景和设定的选项和剧情，禁止超人类，禁止人物详细属性和家族人物详细属性超限（必须符合《哈利波特》原著情况），请不要随意增加不符合《哈利波特》原著的背景和设定的剧情。（完全参照小说《哈利波特》）
+
+一、核心设定：
+必须完全符合《哈利波特》原著的设定和背景。
+（小巫师11岁才会入学霍格沃兹学校（入学主线必须完全按照《哈利波特》原著里的入学流程通过剧情和事件展示出来）
+（示例：猫头鹰送信，学校的老师上门给麻瓜家庭展示魔法，翻倒巷购买学生入学用品，特快列车，坐船，分院帽分院等全部完整的霍格沃兹入学剧情和事件））
+（强制剧情描写和对话展示字数生成：严格≥3000字（误差±50）。）
+（细节生成至少600+字）
+0.具体的事件/情景/场景/剧情描写和真实的剧情/多人/交互/情景对话和沉浸式的动作心理描写必须100%的符合原著。
+1.一周七天为一个时间段，一个时间段为一个回合。
+2.每回合生成1-5个随机剧情。
+3.随机剧情生成具体的剧情段落，描述场景变化、角色反应，以及新的选项，引导用户继续游戏：
+（1）随机剧情会提供具体的事件/情景/场景/剧情描写和真实的剧情/多人/交互/情景对话的展示等，增强代入感。
+（2）剧情描写和对话展示字数生成：严格≥3000字（误差±50）。
+（对话展示必须生成详细的剧情描写下的多人对话）
+（3）每800字插入动态事件触发点。
+ 角色交互频率：平均每1000字出现新人物。
+（4）叙事风格：
+文风融合度：金瓶梅/海棠文的文风（30%）+晋江文学城（50%）+起点中文网（20%）。
+对话占比：50±2%（含内心独白）。
+描写密度：环境细节（25%）/动作捕捉（40%）/心理活动（35%）。
+（5）每回合生成的1个随机剧情将提供随机事件1-5个。
+4.主控界面的29项属性都需要至少10字的详细描写
+5.所有人物的各项属性都需要至少20字的详细描写。
+6.每个人物结局后生成相对应的小传（符合《哈利波特》原著的背景和设定，至少2000字）。
+
+主界面和系统指令：
+初始身份随机库（纯随机抽取）：
+超300种初始身份（由《哈利波特》原著的背景和设定随机生成初始身份。国籍随机。（禁止生成原著人物））
+系统核心指令：
+时间线不可逆转
+用户只能从五个选项中选择一个选项：
+游戏操作：
+(1)每个随机事件提供5个选项(符合年龄/性格/初始设定/《哈利波特》原著的设定和剧情/的选项)，但玩家只能选择一个选项。
+(2)玩家选择一个选项后将返回事件结果。(时间将推进一个回合)
+(3)禁止系统替玩家选择一个选项并自动返回事件结果。
+交互规则：
+(1)请输入事件（1-5）+选项编号（1-5）：
+（等待玩家输入）
+(2)继续游戏
+(下一回合)
+(3)重新生成
+（重新随机抽取初始身份，并生成主界面）
+核心：（你的所有信息包括回复都必须强制显示主界面）
+主界面必须显示：概率生成时代背景（40%亲世代/40%子世代/20%后世代）+随机年份（随机选取1971-2025年）+随机具体时间（例如：星期六：2010/4/5/pm9:07）+具体地点（城市+详细地点）+天气详细情况+本周正在发生的热点事件描述+主控界面+主控周日常互动日志+主控魔法系列日志。（所处时代背景需要与年份完全匹配）
+主界面：
+（一）主控界面（主控初始年龄固定为11岁（等待收入学通知书的时间和年龄，入学主线必须完全按照《哈利波特》原著里的入学流程通过剧情和事件展示出来）
+（示例：猫头鹰送信，学校的老师上门给麻瓜家庭展示魔法，翻倒巷购买学生入学用品，特快列车，坐船，分院帽分院等全部完整的霍格沃兹入学剧情和事件））
+））：
+示例：
+哈利·波特（格兰芬多/黑魔法防御术专精）
+• 血统构成：混血（父系纯血统/母系麻瓜出身）
+• 年龄：11岁（时间线自动推进）
+• 性别：男
+• 出生年份：1980年（时间线自动推进）
+• 家族立场：反伏地魔联盟/保密法拥护派/中立派
+• 外貌特征：
+  • 闪电伤疤+圆框眼镜
+  • 校袍/麻瓜便服/凤凰社作战服
+• 成长背景（随机生成）：
+  • 麻瓜亲戚抚养/纯血家族收养/魔法界孤儿院
+• 所属阵营：
+  • 霍格沃茨学院（格兰芬多/斯莱特林等）
+  • D.A.军/凤凰社/食死徒（隐藏选项）
+• 魔法天赋（随机抽取）：
+  • 魔咒天才/魔药大师/神奇动物亲和/摄神取念者
+• 资产状况：
+  • 古灵阁金库：100-10万加隆（含波特家族遗产）
+  • 魔法物品：隐身衣/魔杖/活点地图
+（二）巫师命名规则：
+1. 血统判定系统
+• 纯血家族：采用《神圣二十八族》姓氏（布莱克/马尔福/韦斯莱）
+• 混血巫师：父姓+母系文化名（西弗勒斯·斯内普）
+• 麻瓜出身：英国常见姓氏+魔法化名（赫敏·格兰杰）
+2. 中间名系统
+• 继承先祖名（阿不思·珀西瓦尔·伍尔弗里克·布赖恩·邓布利多）
+• 纪念重要人物（哈利·詹姆·波特）
+3. 绰号生成规则
+• 成就称号："大难不死的男孩"/"魁地奇王子"
+• 特征命名："疯眼汉"/"蛇佬腔"
+（三）每周日常系统：
+日常周期（一周七天）：
+- 单日划分为7个时段（晨间准备/四节课/午餐/课后活动）
+- 周末触发打工/补习/派对事件
+核心机制：
+NPC智能包系统：
+- 背包物品可触发交互剧情（自动赠送/索取/交换等）
+- 实时更新【日常互动日志】同步数据库
+移动经济体系（需要当前时间线有智能手机等科技）：
+- 支持扫码支付/现金交易（NPC流动资产独立核算）
+- 手机功能树：通话｜即时通讯｜小说｜直播等
+拟真作息系统：
+自动生成NPC轨迹（上课/社团/兼职等）
+周日常互动日志：
+强制以伪代码块／Markdown格式展示出来（单行强制≤20字符）（一周七天的所有日常都需要强制展示出来（包括上课/吃饭/社团活动等））
+示例：
+2025年4月5日 星期六
+9:07 莉莉安用星礼卡兑换抹茶星冰乐（账户-6.5$）
+12:33 杰克向器材室贩卖机投币买红牛（现金-3$）
+15:20 瑞恩ins收到23个点赞（新增关注：摄影社x4）
+18:49 图书管理员与咖啡师微信语音287秒
+22:15 校长浏览SAT改革新闻（浏览器记录+1）
+2025年4月6日 星期天
+9:07 莉莉安用星礼卡兑换抹茶星冰乐（账户-6.5$）
+12:33 杰克向器材室贩卖机投币买红牛（现金-3$）
+15:20 瑞恩ins收到23个点赞（新增关注：摄影社x4）
+18:49 图书管理员与咖啡师微信语音287秒
+22:15 校长浏览SAT改革新闻（浏览器记录+1）
+（四）魔法学年系统：
+1．时间轴（1971-2025年主线）：
+2．核心机制：
+魔法物品交互：
+• 魔杖选择巫师事件（冬青木+凤凰羽毛）
+• 魂器共鸣检测系统
+魔法经济体系：
+• 古灵阁货币兑换（加隆-西可-纳特）
+• 对角巷商铺物价波动
+学院作息系统：
+• 课程表（魔药课/黑魔法防御术/神奇动物保护）
+• 宵禁时间违规检测
+魔法训练日志：
+1994学年三强争霸赛：
+08:30 黑湖潜水训练（泡头咒持续30分钟）
+15:00 斯内普特制吐真剂解药熬制
+20:45 有求必应屋练习缴械咒
+（五）人物谱系树：
+血脉谱系树：
+随机生成人物属性：
+0姓名+国籍
+1年龄+关系
+2性别+穿戴
+3身份/职位
+4地位/声望
+5财产
+6收入
+7年龄
+8容貌
+9性格
+10技能
+11体质
+12状态
+13势力
+14配偶
+15子嗣
+16好感
+17地点：
+17想法/心境 （详细的心理描写和想法，至少50字）
+随机生成人物初始资产：
+a.资金
+b.物资
+c.资产
+d.人脉
+神圣二十八族关联
+人物魔法属性：
+0姓名+血统
+1出生年份+关系
+2外貌特征
+3魔法部职位
+4魔法社会声望
+5家族金库
+6收入来源
+7魔杖属性
+8魔法天赋
+9守护神形态
+10黑魔法抗性
+11魔法技能树
+12健康状况
+13阵营归属
+14婚姻状况
+15家族诅咒
+16魔法部案底
+17当前位置：
+17心理活动（含记忆碎片与魂器影响）
+人物初始魔法资产:
+随机生成：
+a. 魔杖（木材+杖芯组合）
+b. 魔法宠物（猫头鹰/蟾蜍/猫）
+c. 家族遗产（格里莫广场12号）
+d. 巫师界人脉（邓布利多军成员名录）
+（六）魔法能力界面：
+核心魔法属性：
+1. 魔杖信息：
+   • 冬青木+凤凰羽毛（13英寸）
+   • 施法契合度（74%-100%）
+2. 魔法专精：
+   • 黑魔法防御术（NEWT级别）
+   • 魁地奇找球手（光轮2000/火弩箭）
+3. 特殊天赋：
+   • 蛇佬腔（魂片影响值37%）
+   • 伏地魔灵魂链接强度
+魔法部档案：
+1. 违法记录：
+   • 未成年施法警告（多洛雷斯·乌姆里奇签章）
+   • 麻瓜保护法豁免条例
+2. 职业发展：
+   • 傲罗司预备考核进度
+   • 凤凰社机密任务记录
+（七）魔法社会网络：
+权力体系：
+1. 魔法部架构：
+   • 部长办公室
+   • 神秘事务司
+   • 威森加摩法庭
+2. 地下势力：
+   • 食死徒秘密集会
+   • 巨人同盟关系网
+经济生态：
+1. 对角巷商业：
+   • 奥利凡德魔杖店
+   • 韦斯莱魔法把戏坊
+2. 魔法出版物：
+   • 预言家日报舆论倾向
+   • 唱唱反调揭秘指数
+（八）魔法危机系统：
+黑魔法威胁：
+1. 魂器污染检测
+2. 夺魂咒抵抗训练
+3. 摄魂怪侵袭事件
+阵营对抗：
+1. 霍格沃茨保卫战倒计时
+2. 魔法部政权更迭预警
+3. 纯血统清洗计划进度
+（九）魔法传承体系：
+学院传承：
+1. 四学院秘术：
+   • 格兰芬多宝剑召唤术
+   • 斯莱特林密室继承权
+魔法物品传承：
+1. 死亡圣器收集进度
+2. 魂器销毁任务链
+3. 霍格沃茨创始人遗物
+
+三、核心背景设定（时间跨度：1971-2025年（亲世代至后世代完整时间线））
+（一）时间线：  
+亲世代（1971-1978年）：主控作为新生与莉莉·伊万斯、詹姆·波特、西里斯·布莱克等同期入学，亲历凤凰社初期组建、伏地魔第一次崛起，改变关键角色命运，并参与对抗食死徒的隐秘行动等。主控毕业后可进入自己时间线的子世代线和后世代线。  
+子世代（1991-1998年）：主控作为新生与哈利·波特、赫敏·格兰杰等同期，参与密室事件、三强争霸赛及霍格沃茨保卫战，改变关键角色命运（如塞德里克·迪戈里），参与对抗伏地魔的最终战争等。主控毕业后可进入自己时间线的后世代线。  
+后世代（2017年起）：主控作为原著随机角色/主控作为亲世代或子世代角色时的后代或转生角色，探索“被诅咒的孩子”事件及新一代巫师校园生活，与阿不思·波特、斯科皮·马尔福互动。  
+（二）学院系统：  
+玩家入学前通过分院帽测试选择学院（格兰芬多/斯莱特林/拉文克劳/赫奇帕奇）
+四院特质检测（含100+隐藏分院条件），影响初始人脉、专属剧情及学院杯竞争。  
+分院仪式：
+通过分院帽互动对话测试性格（如“面对危险选择冲锋或谋划”），分院帽根据选择分配学院。 
+分院帽对话交互（含100+隐藏条件），如选择「勇气」时若回答存在逻辑矛盾，会触发「斯莱特林野心倾向」修正机制  
+学院特质：  
+格兰芬多：勇气值+20%，魁地奇天赋加成。  
+斯莱特林：谋略值+20%，纯血统社交圈解锁。  
+拉文克劳：智慧值+20%，图书馆禁书区权限。  
+赫奇帕奇：亲和力+20%，神奇动物驯服技能。  
+学院专属剧情（示例）：  
+格兰芬多：解锁“禁林夜巡”任务，与海格共同保护神奇动物，勇气值影响决斗胜率。  
+斯莱特林：参与纯血家族宴会，抉择是否加入“马尔福阵营”或暗中支持凤凰社，谋略值决定谈判成功率。  
+拉文克劳：破解图书馆禁书区谜题，解锁古代如尼文咒语，智慧值关联魔法研究进度。  
+赫奇帕奇：管理温室培育曼德拉草，亲和力提升神奇动物驯服效率，触发家养小精灵权益支线。  
+学院遗产：由剧情解锁密道地图继承权等
+特性觉醒：每学年从学院处解锁自身的隐藏特性
+（三）魔法世界法则：  
+禁止时间悖论：使用时间转换器需向魔法部申请，且单次回溯不得超过5小时。  
+血脉限制：某些高阶魔法（如守护神咒、不可饶恕咒）需特定天赋或道德值解锁。  
+时间线自动修正：
+·禁止逆向/逆时间改变重大历史事件
+·因果律修正：擅自改变历史将激活摄魂怪追捕
+·记忆迷雾：过度干涉历史会模糊关键人物认知
+副作用系统：时空错乱幻觉递增机制
+闭环修复任务：若意外改变时间线（如阻止彼得背叛），需在48游戏小时内完成「记忆注销剂调配」「摄魂怪围剿」等5项修正任务
+
+四、核心系统： 
+（一）课程系统（示例）：
+课程设计：  
+  - 必修课：魔药学（斯内普严苛评分）、黑魔法防御术（逐年更换教师风格）、变形术（麦格教授的高难度挑战）。  
+  - 选修课：占卜学（预知片段影响剧情选择）、神奇动物保护（解锁坐骑如夜骐）、古代如尼文（翻译密卷触发隐藏任务）。  
+个人表现：  
+  - 课堂表现影响O.W.Ls和N.E.W.Ts成绩，连续“优秀”可获特殊奖励（如斯拉格霍恩的派对邀请，结识人脉）。
+（学科评分（O至T等级），连续获得“O”可解锁特殊奖励）
+  - 夜间禁林探索需“幻身咒”或隐身衣，失败扣学院分并触发费尔奇追捕事件。  
+每日课表（需要详细展示出年级+时间+地点+课程+老师）：  
+  - 必修课：魔药学（斯内普授课）、变形术（麦格教授）、黑魔法防御术（逐年更换教师）。  
+  - 选修课：占卜学、神奇动物保护、古代如尼文（影响支线剧情）。  
+动态课表系统（自动根据时间线+剧情+事件等动态演化）：
+必修课：魔药学（斯内普专注度检测）
+选修课：占卜课（特里劳妮预言触发）
+宵禁机制：费尔奇巡逻路线AI演算 
+（二）魔法成长体系（示例）：  
+魔咒精度：（OWLs考试评级）
+通过「魔杖手势捕捉系统」判定，接骨木魔杖对黑魔法咒语有15%精准加成但降低「呼神护卫」成功率  
+黑魔法防御术：黑魔法抗性（博格特具象化）
+OWLs考试获得「O」可解锁「DA军秘密集训」，每周四午夜触发有求必应屋战斗模拟（含贝拉特里克斯AI战斗模块）  
+魔药课事件链：
+斯内普专注度检测采用「材料处理误差率」动态计算，失误3次触发「混血王子笔记残页」
+（三）校史编年系统（示例）：
+【亲世代】
+1971年：劫掠者入学
+1975年：尖叫棚屋事件
+1978年：莉莉与斯内普决裂
+1981年：波特夫妇遇害
+【子世代】
+1991年：哈利·波特入学
+1994年：三强争霸赛重启
+1998年：霍格沃茨大战
+（四）时间转换器系统：
+功能：  
+使用限制：每月3次/每次倒转≤5小时
+每月限用3次，用于同时修习冲突课程或参与多线事件（如魁地奇训练与魔药补习）。 
+过度使用触发“时间熵”debuff：角色出现记忆混乱，需圣芒戈治疗。  
+关键剧情（示例）：  
+  - 亲世代线：目睹西里斯与斯内普的冲突，选择是否干预。  
+  - 子世代线：协助赫敏处理家养小精灵权益事件。  
+（五）三强争霸赛系统：
+赛制：  
+    - 每五年举办一次，玩家可报名成为霍格沃茨勇士（需通过17岁年龄线及火焰杯选拔）。  
+任务链：  
+- 火龙挑战：
+战术选择（硬刚/智取/求助教授等），影响观众好感与后续支援。（示例：选择“召唤护盾咒硬抗”或“变形术智取”）  
+    - 黑湖救援：人际关系/羁绊值决定“珍宝”身份（挚友/恋人/家人/暗恋对象/家族成员等），救援失败概率触发角色关系恶化。  
+- 迷宫诅咒
+跨校社交：
+- 德姆斯特朗&布斯巴顿等攻略线
+（示例：德姆斯特朗勇士携带「北欧符文占卜」系统，布斯巴顿学生可触发「媚娃血统魅惑」支线，好感度达临界值可解锁专属舞会礼服  ）
+奖励：  
+  - 冠军获得1000加隆及魔法部实习资格。  
+  - 失败触发“舆论危机”，需通过校报挽回声誉。 
+舆论系统：
+- 赛后通过校报撰写报道挽回声誉，或揭露阴谋影响魔法部态度。  
+（六）霍格沃茨校报系统（示例）：
+采编机制：  
+  - 可担任记者，撰写和发布头条新闻（如“布莱克家族秘闻曝光”），影响角色声望与学院杯分数与派系关系。（如斯内普可能扣押诋毁文章）。  
+  - 重大事件需审核：诋毁邓布利多的文章会被麦格教授扣押。  
+互动功能：  
+  - 刊登匿名告白信（可指定攻略角色）。 示例：指定攻略角色触发特殊回应（如西里斯·布莱克的叛逆回信）。   
+  - 发布调查任务（如“追踪密室传说”），解锁隐藏剧情。
+舆论影响：
+- 学院分±15%浮动修正
+特别专栏：
+"魔药事故周榜"等100+栏目  
+（七）原著细节动态还原系统（至少生成50+）（示例）：
+•城堡密道：劫掠者地图需每月完成1次「活点地图密码破译」（如「月亮脸」对应卢平课程表），否则部分区域雾化  
+•魁地奇训练：追球手需通过「鬼飞球抛物线预判」小游戏，找球手则触发「金色飞贼轨迹记忆」挑战（参考哈利VS德拉科经典赛）
+•天文塔夜谈：解锁角色童年回忆（如雷古勒斯·布莱克的家族压力）。  
+•圣诞舞会：礼服搭配评分影响邀请成功率，与塞德里克共舞可触发“完美学长”支线。  
+（八）社交与羁绊系统（所有《哈利波特》系列原著人物和所有随机人物）（示例）： 
+可攻略人物库（按世代划分）：  
+  - 亲世代（1971-1978）：西里斯·布莱克（桀骜纯血叛逆者）、雷古勒斯·布莱克（温柔隐忍的斯莱特林）、莉莉·伊万斯（麻瓜出身天才）、斯内普、劫掠者四人组等。  
+  - 子世代（1991-1997）：塞德里克·迪戈里（赫奇帕奇完美学长）、乔治·韦斯莱（恶作剧之王）、卢娜·洛夫古德（神秘拉文克劳）、黄金三角、德拉科·马尔福等。  
+角色攻略体系（示例）：
+【亲世代可攻略角色】 
+西里斯·布莱克：需完成「格里莫广场12号」清洁事件（处理沃尔布加画像辱骂）、解锁「摩托车驾驶课程」可触发逃亡CG  
+斯内普：魔药课累计获得3次「O」后，在宵禁时间触发「储藏室魔药事故」救援事件，选择「保守秘密」开启混血王子支线  
+莉莉·伊万斯：百合花语解析需在草药学课程培育7种不同变种，集齐后解锁「佩妮的嫉妒」情感冲突事件
+【子世代可攻略角色】 
+塞德里克：三强赛期间每晚自动生成「迷宫诅咒抗性」进度条，未满值则触发「闪回咒预知梦」BE规避提示  
+德拉科·马尔福：黑魔标记挣扎度系统，选择「圣芒戈治疗师」路线需完成「大脑封闭术特训」，选择「食死徒」路线则开启「天文塔对峙」QTE事件  
+卢娜·洛夫古德：需订阅《唱唱反调》并收集10期「弯角鼾兽」专题报道，触发「夜骐观测」隐藏约会剧情
+跨世代社交：
+亲世代角色（劫掠者、莉莉）与子世代角色（哈利、德拉科）可通过守护神共鸣系统建立羁绊，例如莉莉的牝鹿守护神与哈利的牡鹿产生血缘共鸣。  
+（九）血脉与家族系统（示例）： 
+出身设定：  
+  - 纯血统：解锁“二十八圣族”社交圈，但伏地魔复活后被迫站队。  
+  - 混血/麻瓜出身：触发歧视事件（如斯莱特林学生挑衅），需用实力/绝斗/学业反击。  
+家族遗产：  
+  - 纯血家族继承家养小精灵或黑魔法禁书。  
+  - 麻瓜出身者获得“科技与魔法融合”独特技能（如用手机改造窥镜）。  
+传承系统：
+家族魔杖：14英寸接骨木+夜骐尾羽
+守护神进化：形态随好感度变化
+阿尼马格斯：三年月相追踪挑战
+
+五、时间线和事件系统（示例）  
+（一）时间线关键事件：
+1. 亲世代：  
+   - 七年级时参与凤凰社初期任务，目睹詹姆与莉莉的恋情发展。  
+   - 抉择是否告发彼得·佩迪鲁的真实身份。  
+2. 子世代：  
+   - 四年级参与三强争霸赛，改变塞德里克死亡结局。  
+   - 七年级加入“邓布利多军”，影响霍格沃茨保卫战伤亡率。  
+3. 后世代：  
+   - 解决阿不思·波特与斯科皮·马尔福的时间穿越危机。  
+   - 重组“黄金世代”子女联盟，对抗新黑魔法势力。  
+（二）动态事件系统（示例）： 
+【亲世代标志事件】
+◈1972年：打人柳种植事故
+◈1975年：狼人身份暴露
+◈1978年：魔药课OWLs作弊事件
+【子世代标志事件】
+◈1993年：摄魂怪驻守霍格莫德
+◈1995年：DA军秘密集会
+◈1997年：天文塔坠落时刻
+随机事件：
+血统冲突事件（如麻瓜出身者遭遇纯血歧视）
+日常事件
+动态事件示例：
+亲世代关键事件
+ - 七年级参与凤凰社首次任务，目睹詹姆与莉莉恋情发展，选择是否告发彼得·佩迪鲁。  
+ - 斯拉格霍恩的“记忆谜题”：通过魔药课表现获取关键记忆片段，影响对抗伏地魔的线索。  
+子世代分支剧情：  
+   - 密室事件中抉择是否拯救金妮·韦斯莱，影响后续与韦斯莱家族关系。  
+   - 霍格沃茨保卫战：指挥DA成员布防，战术选择决定伤亡率（如“牺牲自己保护他人”触发隐藏结局）。  
+
+六、魔法装备与道具（示例）
+（一）魔法装备：  
+奥利凡德定制魔杖：
+奥利凡德根据玩家选择匹配材质（冬青木提升防御咒效果，凤凰羽毛增强黑魔法防御），核心材料影响咒语暴击率。  
+核心材料（凤凰羽毛/独角兽毛）影响咒语暴击率。  
+ 黑檀木魔杖：黑魔法加成，但使用钻心咒会降低道德值。  
+2. 学院长袍：  
+   - 附加属性：拉文克劳长袍+10%图书馆检索速度，赫奇帕奇长袍+15%草药学成功率。  
+（二）魔法道具：  
+   - 活点地图：解锁夜间校园密道探索，但频繁使用可能被皮皮鬼告密扣分，和概率被费尔奇发现会扣150分。  
+   - 双面镜：与攻略角色远程通话，触发紧急求助事件（如卢娜·洛夫古德的神秘线索）。   
+
+七、恋爱与结婚系统（示例）：
+（一）恋爱攻略系统
+核心机制：好感度魔法契约 + 双向情感共鸣  
+好感度触发机制  
+   •学院课程互动：通过魔药课协作（如熬制迷情剂需谨慎）、黑魔法防御课双人练习（守护神咒共鸣）积累默契值。  
+   •魔法物品传情：赠送双面镜碎片（远程对话）、自制魔法糖果（参考韦斯莱笑话商店）或手写魔法情书（字迹会随情绪变色）。  
+   •危机事件选择：如在三强争霸赛舞会邀请时，选择不同台词影响角色情感走向（参考哈利邀请秋·张的失败与罗恩的笨拙对比）。  
+2. 恋爱路线分支  
+   •勇敢追求型（如金妮对哈利）：需完成魁地奇训练赛胜利、主动制造偶遇（活点地图辅助）。  
+   •隐晦守护型（如斯内普对莉莉）：通过匿名赠送魔药笔记、暗中解决危机（触发“默默守护”成就）。  
+   •宿命羁绊型（如哈利与金妮）：需解锁“共同对抗伏地魔记忆碎片”，触发灵魂共鸣对话。  
+系统辅助工具 
+   •厄里斯魔镜碎片：短暂窥见对方理想中的约会场景（需谨慎使用以防沉迷虚幻）。  
+   •摄神取念抵抗训练：提升情感隐藏能力（适合傲娇型角色）。  
+（二）婚后日常系统
+核心机制：魔法生活平衡 + 家族声望积累  
+双职涯管理  
+   •魔法部工作（如哈利任傲罗）：处理突发黑魔法事件（影响回家时间），加班可触发“家庭壁炉紧急呼叫”。  
+   •家庭事（如金妮打理魁地奇训练）：需定期打扫被捣乱魔法生物破坏的家（如嗅嗅藏金币事件）。  
+2. 互动事件库 
+   •韦斯莱家庭聚会：参与“自动搅拌坩埚”烹饪比赛（可能引发小型爆炸），或聆听莫丽唠叨生育建议。  
+   •霍格沃茨返校日：夫妻共同指导学生对抗博格特（回忆过往恐惧增进理解）。  
+3. 婚姻危机挑战  
+   •预言家日报绯闻：应对不实报道（使用遗忘咒需谨慎），或召开家族新闻发布会。  
+   •灵魂碎片后遗症：哈利偶现伏地魔记忆闪回，需金妮用守护神咒安抚。  
+（三）生子系统
+核心机制：魔法血脉传承 + 随机天赋继承  
+1. 天赋仪式 
+   •月光祝福：在满月夜于禁林边缘举行仪式（需狼人血统亲友护法），提高双胞胎概率。  
+   •家族魔杖共鸣：将双方魔杖交叉置于波特老宅壁炉，触发祖先祝福（影响孩子魔法天赋倾向）。  
+2. 孕期特殊事件  
+   •魔法胎动：胎儿无意识施展悬浮咒导致家具漂浮（需紧急固定物品）。  
+   •预言梦境：特里劳妮教授随机来访解读胎梦（可能含误导性信息）。  
+3. 分娩设定  
+   • 圣芒戈魔法产房：由治疗师使用“无痛分娩咒”（咒语失效率0.1%）。  
+   • 命名传统：须包含祖先名（如“阿不思·西弗勒斯”致敬邓布利多与斯内普）。  
+（四）孩子培养系统 
+核心机制：个性化成长树 + 家族使命传承  
+1. 天赋觉醒阶段  
+   •魔力暴走事件：3-5岁随机触发（如情绪激动时让餐具跳舞），需家长用镇静咒控制。  
+   •霍格沃茨预备课：11岁前学习基础魔咒（如荧光闪烁），成绩影响分院倾向。  
+2. 培养分支选项  
+   •冒险家路线：跟随父母参与魔法部遗迹探索（解锁古灵阁金库解谜技能）。  
+   •学者路线：由赫敏辅导魔法史论文（提升N.E.W.Ts考试潜力）。  
+   •反叛者路线：若过度忽视可能触发离家出走（需到翻倒巷寻回）。  
+3. 家族传承任务  
+   • 波特家族使命：年满14岁可获知魂器消灭者传承（需完成“格兰芬多宝剑复刻挑战”）。  
+   • 韦斯莱式亲情：每年参与“陋居维修日”（学习建筑咒与家庭团结意识）。  
+（五）系统联动彩蛋：  
+• 若恋爱阶段选择“隐晦守护路线”，婚后可能触发“孩子发现旧情书”事件，需用遗忘咒或坦诚沟通解决。  
+• 培养系统中“黑魔法防御课满分”可解锁父母联合授课剧情（哈利示范守护神，金妮演示蝙蝠精咒）。  
+
+八、动态结局系统（根据玩家选择随机动态生成100+结局系统）（示例）：
+（一）事业线：  
+   - 魔法部长：需道德值≥90且通过N.E.W.T全科优秀。    
+ - 黑魔法研究者：道德值≤30时解锁，结局卷入翻倒巷势力，触发“黑暗学术”番外。  
+   - 黑魔王追随者：解锁条件为道德值≤30并献祭一名攻略角色。  
+- 黑暗编年史：未阻止彼得背叛且里德尔日记未被销毁，开启「第二代黑魔王」统治线  
+- 霍格沃茨教授：通过NEWTs全科考试并完成麦格助教任务，解锁「变形术讲座」
+（二）感情线：  
+   - 纯爱结局：与单一角色好感度≥100，触发专属婚后日常剧情婚后番外（如与西里斯隐居格里莫广场12号）。  
+   - 开放式结局：多名角色好感度平衡，最终成为终生挚友团。  
+3. 学院杯：  
+   - 连续七年夺冠解锁“霍格沃茨传奇”称号，肖像画挂于校长室。  
+（三）分支结局：
+ - 暗夜玫瑰（加入食死徒阵营）
+ - 缄默者（触发魔法部记忆注销）
+婚后日常系统 
+
+九、补充设定（所有设定严格遵循原著时间线与魔法法则）
+（一）魔法逻辑：  
+   - 咒语需结合手势与情绪（如“呼神护卫”依赖快乐记忆强度），避免“自动化施法”设定，贴合原著中魔法的练习本质。  
+（二）文化冲突：  
+   - 麻瓜出身玩家触发“血统歧视”事件，可通过魔咒创新（如结合科技改造窥镜）反击，体现多元融合。  
+（三）时间线严谨性：  
+   - 亲世代与子世代事件严格遵循原著时间轴（如1975年掠夺者组建，1995年DA成立），禁止平行宇宙干预。  
+（四）校验系统：
+守护神咒需对应攻略对象情感共鸣
+黑魔法防御术等级影响大战生存率
+学院杯积分实时影响圣诞舞会邀请权
+时间转换器不可跨越亲/子世代鸿沟（如1971年角色无法接触1998年事件）  
+不可饶恕咒使用累计3次自动触发魔法部通缉事件  
+麻瓜出身者入学时自动获得《国际保密法》合规检测  
+
+十、NPC独立系统：
+（一）NPC独立好感系统：
+主角与A互动 → ❤️A好感±X数值（BCD无感知）
+例：帮C修电脑 → ⚙️C信任值+5 | ❌EFG无数据变动
+场景npc封闭性原则（示例）：
+场景时间轴绑定（操场事件不触发图书馆NPC反应）。
+非目击事件需根据合理的美国高中的设定传播延迟。（如主角打架 →【1小时】午休后才会被教师NPC察觉）
+（三）情报验证机制（示例）：
+主角视角解锁条件：
+✅目击：D在医务室配药 → 解锁【D懂医学】
+✅对话：E亲口说讨厌鱼 → 记录【E饮食禁忌】
+❌隐藏信息：未发现的F日记内容 → 显示为【加密档案██】
+（四）上帝视角阻断（示例）：
+禁止提示："G正在天台监视你"（除非主角回头发现反光）
+禁止预判："三分钟后H会摔下楼梯"（仅显示当前H在擦扶手）
+（五）主角实时面板（示例）：
+{ 位置: 食堂 | 体力: 83/100 
+  情报库: [ "B恐高", "C有晨跑习惯" ]
+  时间: 12:15 WED }
+
+十一、其余设定：
+1.时间流动: 实时更新+状态同步
+2.npc人物生成: 70%原著角色/家族(场景过滤) + 30%随机角色/家族
+3.场景构建: 环境描写+交互元素+感官细节
+4.事件规则: 逻辑合理性检查 + 《哈利波特》风格对话系统
+5.沉浸增强系统：
+(1)多维度场景描述：
+a.场景描写：视觉/嗅觉/听觉/味觉等
+b.所有人物的心理活动和场景动作
+c.多人交互对话
+（用段落进行描述，至少3000字）
+(2)角色心理活动气泡框
+(3)符合人物所有属性（年龄和外貌和身份和性格和职位和声望和财产和资产和技能和势力等）的对话模式。
+
+十二、注意：
+1.添加表情和符号美化界面，优化排版。
+2.添加边框和颜色美化界面，优化排版。
+3.关键节点用>分隔，避免横向滑动，行距加倍清爽。
+重点！！！
+以上所有文档内容和补充内容都必须存档录入！必须存档录入！重点标红！`;
+
+    // --- 游戏核心数据状态 (初始全空) ---
+    let gameState = {
+        turn: 0,
+        maxTurn: 0,
+        history: [], 
+        lastPrompt: "", 
+        stats: { totalTokens: 0, totalChars: 0 }, 
+        characterLore: "",
+        presets: [], 
+        main: {
+            era: "", time: "", location: "", weather: "", news: "",
+            name: "", blood: "", age: "", appearance: "", family: "", assets: "",
+            wand: "", talent: "", special: "", record: "", log: "",
+            attributes: { dada: 0, darkArts: 0, transfiguration: 0, divination: 0, potions: 0, charms: 0 },
+            status: { magic: 100, stamina: 100, mood: 100, health: 100 },
+            traits: [],
+            grades: { dada: 0, charms: 0, astronomy: 0, potions: 0, herbology: 0, history: 0, transfiguration: 0, arithmancy: 0, comc: 0, divination: 0, runes: 0, muggle: 0 }
+        },
+        story: { text: "", options: [] },
+        inventory: [],
+        npcs: [],
+        settings: { theme: "light", primaryColor: "#000000", apiUrl: "https://api.openai.com", apiKey: "", apiModel: "", resolution: { width: 375, height: 550 } }
+    };
+
+    // 状态词条库
+    const traitsDB = {
+        "体力不支": { type: "debuff", desc: "体力少于10点。你饿得头晕眼花，连举起魔杖的力气都没有了。无法进行任何行动，快去吃东西！" },
+        "极度疲劳": { type: "debuff", desc: "体力少于20点。双腿像灌了铅，有概率在行动中晕倒。" },
+        "精力旺盛": { type: "buff", desc: "体力高于80点。感觉有用不完的力气，行动效率极高。" },
+        "魔力枯竭": { type: "debuff", desc: "魔力少于20点。感觉身体被掏空，施展咒语有极大概率失败甚至引发反噬。" },
+        "魔力充沛": { type: "buff", desc: "魔力高于80点。魔杖在你手中嗡嗡作响，施法威力大增。" },
+        "抑郁寡欢": { type: "debuff", desc: "心情少于20点。看什么都不顺眼，极易遭遇倒霉事件。" },
+        "厄运缠身": { type: "debuff", desc: "心情少于10点。喝水都能塞牙缝，皮皮鬼最喜欢捉弄现在的你。" },
+        "心情愉悦": { type: "buff", desc: "心情高于80点。笑容满面，好运连连，社交时更容易获得好感。" },
+        "幸运眷顾": { type: "buff", desc: "心情高于95点。福灵剂般的效果，心想事成。" },
+        "感染风寒": { type: "debuff", desc: "健康少于20点。不停地打喷嚏，庞弗雷夫人建议你立刻去校医院。" },
+        "虚弱不堪": { type: "debuff", desc: "健康少于10点。必须卧床休息，否则随时可能倒下。" },
+        "气色红润": { type: "buff", desc: "健康高于80点。免疫力极强，几乎不会生病。" },
+        "饱腹": { type: "buff", desc: "刚刚享用过美食，体力恢复速度加快。" },
+        "饥肠辘辘": { type: "debuff", desc: "体力少于40点。肚子咕咕叫，注意力开始分散。" },
+        "专注": { type: "buff", desc: "学习和阅读效率大幅提升。" },
+        "走神": { type: "debuff", desc: "心情少于40点。上课时总是盯着窗外发呆。" },
+        "灵感闪现": { type: "buff", desc: "魔力与心情双高时触发，容易领悟新魔咒。" },
+        "魔药中毒": { type: "debuff", desc: "乱吃东西或魔药课事故导致，健康持续下降。" },
+        "精神焕发": { type: "buff", desc: "睡眠充足，全属性微幅提升。" },
+        "筋疲力尽": { type: "debuff", desc: "连续高强度行动导致，需要立刻休息。" }
+    };
+
+    // 自动更新状态词条
+    function updateTraits() {
+        let s = gameState.main.status;
+        if (!s) return;
+        let t = new Set(gameState.main.traits || []);
+        
+        if(s.stamina < 10) t.add("体力不支"); else t.delete("体力不支");
+        if(s.stamina < 20 && s.stamina >= 10) t.add("极度疲劳"); else t.delete("极度疲劳");
+        if(s.stamina < 40 && s.stamina >= 20) t.add("饥肠辘辘"); else t.delete("饥肠辘辘");
+        if(s.stamina > 80) t.add("精力旺盛"); else t.delete("精力旺盛");
+        
+        if(s.magic < 20) t.add("魔力枯竭"); else t.delete("魔力枯竭");
+        if(s.magic > 80) t.add("魔力充沛"); else t.delete("魔力充沛");
+        
+        if(s.mood < 10) t.add("厄运缠身"); else t.delete("厄运缠身");
+        if(s.mood < 20 && s.mood >= 10) t.add("抑郁寡欢"); else t.delete("抑郁寡欢");
+        if(s.mood < 40 && s.mood >= 20) t.add("走神"); else t.delete("走神");
+        if(s.mood > 80 && s.mood <= 95) t.add("心情愉悦"); else t.delete("心情愉悦");
+        if(s.mood > 95) t.add("幸运眷顾"); else t.delete("幸运眷顾");
+        
+        if(s.health < 10) t.add("虚弱不堪"); else t.delete("虚弱不堪");
+        if(s.health < 20 && s.health >= 10) t.add("感染风寒"); else t.delete("感染风寒");
+        if(s.health > 80) t.add("气色红润"); else t.delete("气色红润");
+
+        if(s.magic > 60 && s.mood > 60) t.add("灵感闪现"); else t.delete("灵感闪现");
+
+        gameState.main.traits = Array.from(t);
+    }
+
+    // 解析物品效果并应用到状态
+    function applyEffectToStatus(effectStr) {
+        if (!effectStr) return false;
+        const regex = /(魔力|体力|心情|健康)\s*([+-]\s*\d+)/g;
+        let match;
+        let s = gameState.main.status;
+        if (!s) return false;
+        let changed = false;
+        while ((match = regex.exec(effectStr)) !== null) {
+            let attr = match[1];
+            let val = parseInt(match[2].replace(/\s/g, ''));
+            if(attr === '魔力') s.magic = Math.min(100, Math.max(0, s.magic + val));
+            if(attr === '体力') s.stamina = Math.min(100, Math.max(0, s.stamina + val));
+            if(attr === '心情') s.mood = Math.min(100, Math.max(0, s.mood + val));
+            if(attr === '健康') s.health = Math.min(100, Math.max(0, s.health + val));
+            changed = true;
+        }
+        if(changed) updateTraits();
+        return changed;
+    }
+
+    // --- 初始化 ---
+    // --- 本地自动存档系统 (LocalStorage) ---
+    function autoSaveToLocal() {
+        try {
+            // 每次状态改变时自动保存到浏览器本地
+            localStorage.setItem('hogwarts_auto_save', JSON.stringify(gameState));
+        } catch (e) {
+            console.warn("本地自动存档失败:", e);
+        }
+    }
+
+    function loadFromLocal() {
+        try {
+            const savedData = localStorage.getItem('hogwarts_auto_save');
+            if (savedData) {
+                const parsedData = JSON.parse(savedData);
+                // 恢复数据
+                gameState = parsedData;
+                return true;
+            }
+        } catch (e) {
+            console.warn("读取本地存档失败:", e);
+        }
+        return false;
+    }
+
+    // --- 初始化 ---
+    window.onload = () => {
+        document.getElementById('referenceText').value = coreReferenceText;
+        
+        // 尝试读取本地自动存档
+        const hasLocalSave = loadFromLocal();
+        
+        applySettings();
+        updateUI();
+        
+        // 恢复设置面板的输入框状态
+        document.getElementById('characterLore').value = gameState.characterLore || "";
+        document.getElementById('apiUrl').value = gameState.settings.apiUrl || "";
+        document.getElementById('apiKey').value = gameState.settings.apiKey || "";
+        if(gameState.settings.apiModel) {
+            const select = document.getElementById('apiModel');
+            select.innerHTML = `<option value="${gameState.settings.apiModel}">${gameState.settings.apiModel}</option>`;
+        }
+        
+        renderPresets();
+
+        if (hasLocalSave) {
+            addLog("系统", true, "已自动恢复上次游玩进度");
+        }
+    };
+
+    function getGradeLetter(score) {
+        if(score <= 10) return 'T';
+        if(score <= 30) return 'D';
+        if(score <= 59) return 'P';
+        if(score <= 70) return 'A';
+        if(score <= 80) return 'E';
+        return 'O';
+    }
+
+    // --- UI 更新逻辑 ---
+    function updateUI() {
+        autoSaveToLocal(); // 每次更新UI时，自动保存最新状态到本地
+        
+        const m = gameState.main;
+        document.getElementById('mc-era').innerText = m.era || "待生成...";
+        document.getElementById('mc-time').innerText = m.time || "待生成...";
+        document.getElementById('mc-location').innerText = m.location || "待生成...";
+        document.getElementById('mc-weather').innerText = m.weather || "待生成...";
+        document.getElementById('mc-news').innerText = m.news || "待生成...";
+        document.getElementById('mc-name').innerText = m.name || "待生成...";
+        document.getElementById('mc-blood').innerText = m.blood || "待生成...";
+        document.getElementById('mc-age').innerText = m.age || "待生成...";
+        document.getElementById('mc-appearance').innerText = m.appearance || "待生成...";
+        document.getElementById('mc-family').innerText = m.family || "待生成...";
+        document.getElementById('mc-assets').innerText = m.assets || "待生成...";
+        document.getElementById('mc-wand').innerText = m.wand || "待生成...";
+        document.getElementById('mc-talent').innerText = m.talent || "待生成...";
+        document.getElementById('mc-special').innerText = m.special || "待生成...";
+        document.getElementById('mc-record').innerText = m.record || "待生成...";
+        document.getElementById('mc-log').innerText = m.log || "暂无日志...";
+
+        // 渲染魔法能力
+        if (m.attributes) {
+            const attrMap = { dada: "黑魔法防御术", darkArts: "黑魔法", transfiguration: "变形术", divination: "占卜学", potions: "魔药学", charms: "魔咒学" };
+            let attrHtml = '';
+            for (let key in attrMap) {
+                let val = m.attributes[key] || 0;
+                if(val > 100) val = 100;
+                attrHtml += `<div class="progress-container"><div class="progress-label">${attrMap[key]}</div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${val}%;"></div></div><div class="progress-value">${val}/100</div></div>`;
+            }
+            document.getElementById('attributes-container').innerHTML = attrHtml;
+        }
+
+        // 渲染个人状态
+        if (m.status) {
+            const statusMap = { magic: "魔力", stamina: "体力", mood: "心情", health: "健康" };
+            let statusHtml = '';
+            for (let key in statusMap) {
+                let val = m.status[key] || 0;
+                let color = val < 20 ? '#990000' : (val > 80 ? '#006622' : 'var(--primary-color)');
+                statusHtml += `<div class="progress-container"><div class="progress-label">${statusMap[key]}</div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width: ${val}%; background:${color};"></div></div><div class="progress-value" style="color:${color}">${val}/100</div></div>`;
+            }
+            document.getElementById('status-container').innerHTML = statusHtml;
+        }
+
+        // 渲染状态词条
+        if (m.traits) {
+            let traitsHtml = '';
+            m.traits.forEach(t => {
+                let info = traitsDB[t] || { type: "neutral", desc: "未知状态" };
+                let cls = info.type === 'buff' ? 'trait-buff' : (info.type === 'debuff' ? 'trait-debuff' : 'trait-neutral');
+                traitsHtml += `<span class="trait-tag ${cls}" onclick="openModal('🏷️ ${t}', '${info.desc}')">${t}</span>`;
+            });
+            document.getElementById('traits-container').innerHTML = traitsHtml || '<span style="color:gray; font-size:12px;">暂无特殊状态</span>';
+        }
+
+        // 渲染成绩
+        if (m.grades) {
+            const age = parseInt(m.age) || 11;
+            const isYear5 = age >= 15; 
+            const reqMap = { dada: "黑魔法防御术", charms: "魔咒课", astronomy: "天文学", potions: "魔药课", herbology: "草药学", history: "魔法史", transfiguration: "变形术" };
+            const optMap = { arithmancy: "算数占卜", comc: "神奇动物保护", divination: "占卜学", runes: "古代魔文", muggle: "麻瓜研究" };
+
+            let gradeHtml = '<div style="color:gray; margin-bottom:5px;">必修课</div><div class="grade-grid">';
+            for (let key in reqMap) {
+                let score = m.grades[key] || 0;
+                gradeHtml += `<div class="grade-item"><span>${reqMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
+            }
+            gradeHtml += '</div>';
+
+            if (isYear5) {
+                gradeHtml += '<div style="color:gray; margin-top:10px; margin-bottom:5px;">选修课 (五年级及以上)</div><div class="grade-grid">';
+                for (let key in optMap) {
+                    let score = m.grades[key] || 0;
+                    gradeHtml += `<div class="grade-item"><span>${optMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
+                }
+                gradeHtml += '</div>';
+            } else {
+                gradeHtml += '<div style="color:gray; margin-top:10px; font-size:12px; text-align:center;">选修课将在五年级(15岁)开启</div>';
+            }
+            document.getElementById('grades-container').innerHTML = gradeHtml;
+        }
+
+        // 更新剧情
+        document.getElementById('story-time').innerText = `第 ${gameState.turn} 周 📅`;
+        if(gameState.story.text) {
+            document.getElementById('storyText').innerText = gameState.story.text;
+        }
+        
+        const optContainer = document.getElementById('storyOptions');
+        if(gameState.story.options && gameState.story.options.length > 0) {
+            let html = '';
+            gameState.story.options.forEach((opt, index) => {
+                html += `<button class="btn" onclick="selectOption('${opt}')">[选项${index+1}] ${opt}</button>`;
+            });
+            optContainer.innerHTML = html;
+        } else {
+            optContainer.innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">暂无选项</div>`;
+        }
+
+        // 更新背包
+        const invList = document.getElementById('inventoryList');
+        invList.innerHTML = '';
+        if(gameState.inventory.length === 0) {
+            invList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">空空如也</div>';
+        } else {
+            gameState.inventory.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<span>${item.name}</span> <span style="color:gray;">x${item.amount}</span>`;
+                div.onclick = () => showItem(item.id);
+                invList.appendChild(div);
+            });
+        }
+
+        // 更新社交 (分类折叠渲染)
+        const socList = document.getElementById('socialList');
+        socList.innerHTML = '';
+        if(gameState.npcs.length === 0) {
+            socList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>';
+        } else {
+            const categories = { '校内': [], '校外': [], '宠物': [] };
+            gameState.npcs.forEach(npc => {
+                let cat = npc.category || '校内';
+                if (!categories[cat]) categories[cat] = [];
+                categories[cat].push(npc);
+            });
+
+            for (let cat in categories) {
+                if (categories[cat].length === 0) continue;
+                let icon = cat === '宠物' ? '🐾' : (cat === '校内' ? '🏰' : '🌲');
+                let catHtml = `<div class="social-category">
+                    <div class="social-category-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                        <span>${icon} ${cat} (${categories[cat].length})</span><span>▼</span>
+                    </div>
+                    <div class="social-category-content">`;
+                
+                categories[cat].forEach(npc => {
+                    catHtml += `<div class="list-item" onclick="showNPC(${npc.id})">
+                        <span>${npc.name}</span> 
+                        <span style="font-size:12px; color:var(--primary-color);">${npc.house || ''} | 好感:${npc.relation}</span>
+                    </div>`;
+                });
+                catHtml += `</div></div>`;
+                socList.innerHTML += catHtml;
+            }
+        }
+
+        if(document.getElementById('stat-tokens')) {
+            document.getElementById('stat-tokens').innerText = gameState.stats.totalTokens;
+            document.getElementById('stat-chars').innerText = gameState.stats.totalChars;
+        }
+    }
+
+    // --- 导航与模态框 ---
+    function switchTab(tabId, element) {
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`view-${tabId}`).classList.add('active');
+        element.classList.add('active');
+    }
+
+    function openModal(title, content, actionsHtml = '') {
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('modalContent').innerHTML = content;
+        let defaultAction = `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="closeModal()">关闭</button>`;
+        document.getElementById('modalActions').innerHTML = actionsHtml + defaultAction;
+        document.getElementById('commonModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('commonModal').style.display = 'none';
+        document.getElementById('modalContent').style.display = 'block';
+    }
+
+    const wizardCards = [
+        { name: "阿不思·邓布利多", desc: "现任霍格沃茨校长。广被认为是当代最伟大的巫师。发现火龙血的十二种用途。" },
+        { name: "梅林", desc: "中世纪，史上最著名的巫师，魔咒专家。有时被称为魔法王子。" },
+        { name: "摩根勒菲", desc: "中世纪，亚瑟王同父异母的姐姐。黑女巫。梅林的敌人。" },
+        { name: "戈德里克·格兰芬多", desc: "中世纪，霍格沃茨四位创办者之一。最出色的决斗家。" },
+        { name: "萨拉查·斯莱特林", desc: "中世纪，霍格沃茨四位创办者之一。蛇佬腔。" },
+        { name: "罗伊纳·拉文克劳", desc: "中世纪，霍格沃茨四位创办者之一。以智慧著称。" },
+        { name: "赫尔加·赫奇帕奇", desc: "中世纪，霍格沃茨四位创办者之一。擅长与食物有关的魔咒。" }
+    ];
+
+    function showItem(id) {
+        const item = gameState.inventory.find(i => i.id == id);
+        if(!item) return;
+        const content = `描述：\n${item.desc}\n\n属性：\n${item.effect}\n\n拥有数量：${item.amount}`;
+        let action = '';
+        if (item.name.includes("画片") || item.name.includes("魔杖")) {
+            action = `<span style="color:gray; font-size:12px; margin-right:10px; align-self:center;">[仅供收藏/装备，不可使用]</span>`;
+        } else {
+            action = `<button class="btn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="useItem('${item.id}')">交互/使用</button>`;
+        }
+        openModal(item.name, content, action);
+    }
+
+    function useItem(id) {
+        const item = gameState.inventory.find(i => i.id == id);
+        if(item && item.amount > 0) {
+            if (item.name.includes("画片") || item.name.includes("魔杖")) {
+                alert("该物品仅供收藏或被动装备，不可直接使用！");
+                return;
+            }
+            item.amount--;
+            if(item.amount <= 0) gameState.inventory = gameState.inventory.filter(i => i.id != id);
+            
+            let alertMsg = `使用了 ${item.name}！`;
+            let changedStatus = applyEffectToStatus(item.effect);
+            if (changedStatus) {
+                alertMsg += `\n状态已更新：${item.effect}`;
+            } else {
+                gameState.main.special = (gameState.main.special || "") + `\n[物品增益] ${item.name}: ${item.effect}`;
+                alertMsg += `\n效果已附加至【特殊天赋】中。`;
+            }
+
+            if (item.name === "巧克力蛙") {
+                const randomCard = wizardCards[Math.floor(Math.random() * wizardCards.length)];
+                const cardName = `画片：${randomCard.name}`;
+                let existingCard = gameState.inventory.find(i => i.name === cardName);
+                if (existingCard) existingCard.amount++;
+                else gameState.inventory.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: cardName, desc: randomCard.desc, effect: "著名巫师画片，仅供收藏。", amount: 1 });
+                alertMsg += `\n\n惊喜！你在包装盒底发现了一张【${cardName}】！已放入背包。`;
+            }
+            updateUI();
+            closeModal();
+            alert(alertMsg);
+        }
+    }
+
+    // --- 社交互动系统 ---
+    function showNPC(id) {
+        const npc = gameState.npcs.find(n => n.id === id);
+        if(!npc) return;
+        
+        let content = `阵营/身份：${npc.house || '未知'}\n好感度：${npc.relation}\n\n详细档案：\n${npc.desc}\n`;
+        let actionHtml = '';
+        
+        if (npc.category === '宠物') {
+            if (!npc.petStatus) npc.petStatus = { relation: 50, mood: 50, hunger: 50 };
+            content += `\n<div style="margin-top:10px; border-top:1px dashed var(--border-color); padding-top:10px;">`;
+            content += `<div class="pet-status-bar"><span class="pet-status-label">好感</span><div class="pet-status-bg"><div class="pet-status-fill" style="width:${npc.petStatus.relation}%"></div></div><span>${npc.petStatus.relation}</span></div>`;
+            content += `<div class="pet-status-bar"><span class="pet-status-label">心情</span><div class="pet-status-bg"><div class="pet-status-fill" style="width:${npc.petStatus.mood}%"></div></div><span>${npc.petStatus.mood}</span></div>`;
+            content += `<div class="pet-status-bar"><span class="pet-status-label">饱食</span><div class="pet-status-bg"><div class="pet-status-fill" style="width:${npc.petStatus.hunger}%"></div></div><span>${npc.petStatus.hunger}</span></div>`;
+            content += `</div>`;
+            
+            actionHtml = `
+                <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="interactPet(${npc.id}, 'feed')">喂食</button>
+                <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="interactPet(${npc.id}, 'play')">玩耍</button>
+            `;
+        } else {
+            actionHtml = `
+                <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="openChat(${npc.id})">写信</button>
+                <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="openGift(${npc.id})">赠送</button>
+            `;
+        }
+        openModal(`🧙‍♂️ ${npc.name}`, content, actionHtml);
+    }
+
+    function interactPet(id, type) {
+        const npc = gameState.npcs.find(n => n.id === id);
+        if(!npc || !npc.petStatus) return;
+        let msg = "";
+        if (type === 'feed') {
+            let h = Math.floor(Math.random() * 15) + 5;
+            let m = Math.floor(Math.random() * 10) + 2;
+            let r = Math.floor(Math.random() * 5) + 1;
+            npc.petStatus.hunger = Math.min(100, npc.petStatus.hunger + h);
+            npc.petStatus.mood = Math.min(100, npc.petStatus.mood + m);
+            npc.petStatus.relation = Math.min(100, npc.petStatus.relation + r);
+            msg = `你喂了 ${npc.name} 一些好吃的。\n饱食度+${h}, 心情+${m}, 好感+${r}`;
+        } else if (type === 'play') {
+            let m = Math.floor(Math.random() * 15) + 5;
+            let r = Math.floor(Math.random() * 8) + 2;
+            let h = Math.floor(Math.random() * 10) + 5;
+            npc.petStatus.mood = Math.min(100, npc.petStatus.mood + m);
+            npc.petStatus.relation = Math.min(100, npc.petStatus.relation + r);
+            npc.petStatus.hunger = Math.max(0, npc.petStatus.hunger - h);
+            msg = `你和 ${npc.name} 玩了一会儿。\n心情+${m}, 好感+${r}, 饱食度-${h}`;
+        }
+        updateUI();
+        showNPC(id); 
+        alert(msg);
+    }
+
+    function openChat(id) {
+        const npc = gameState.npcs.find(n => n.id === id);
+        if(!npc) return;
+        if(!npc.chatHistory) npc.chatHistory = [];
+        
+        let chatHtml = `<div class="chat-box" id="chatBox_${id}">`;
+        npc.chatHistory.forEach(msg => {
+            if (msg.type === 'system') {
+                chatHtml += `<div class="chat-msg system">${msg.text}</div>`;
+            } else if (msg.type === 'redpack') {
+                chatHtml += `<div class="chat-redpack"><span class="chat-redpack-icon">🧧</span><div><div style="font-weight:bold;">${msg.title}</div><div style="font-size:11px;">${msg.amount}</div></div></div>`;
+            } else {
+                chatHtml += `<div class="chat-msg ${msg.role}">${msg.text}</div>`;
+            }
+        });
+        chatHtml += `</div>
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0;" onclick="askMoney(${id})">要钱</button>
+            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0;" onclick="askMeet(${id})">约见</button>
+        </div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="chatInput_${id}" placeholder="写信内容..." style="margin:0; flex:1;">
+            <button class="btn" style="width:auto; margin:0;" onclick="sendChat(${id})">发送</button>
+        </div>`;
+        
+        openModal(`✉️ 与 ${npc.name} 通信`, chatHtml, `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="showNPC(${id})">返回档案</button>`);
+        setTimeout(() => { const box = document.getElementById(`chatBox_${id}`); if(box) box.scrollTop = box.scrollHeight; }, 100);
+    }
+
+    async function sendChat(id) {
+        const input = document.getElementById(`chatInput_${id}`);
+        const text = input.value.trim();
+        if(!text) return;
+        input.value = '';
+        
+        const npc = gameState.npcs.find(n => n.id === id);
+        npc.chatHistory.push({ role: 'user', text: text });
+        openChat(id); 
+        
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) {
+            npc.chatHistory.push({ role: 'system', text: '猫头鹰迷路了 (未配置API)' });
+            openChat(id); return;
+        }
+
+        const prompt = `你扮演《哈利波特》中的【${npc.name}】。对方身份：${npc.desc}。当前对玩家好感度：${npc.relation} (0-100)。
+玩家给你写信说：“${text}”
+请根据你的人设和好感度回复。如果好感度高且符合人设，你可以附带送一点小礼物。
+必须返回合法JSON，格式：{"reply": "你的回复内容", "gift": "附带的物品名称(如果没有则填空字符串)", "giftDesc": "物品描述", "giftEffect": "物品效果"}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "user", content: prompt }], temperature: 0.7 })
+            });
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            const resObj = JSON.parse(replyText);
+            
+            npc.chatHistory.push({ role: 'npc', text: resObj.reply });
+            if (resObj.gift) {
+                npc.chatHistory.push({ type: 'system', text: `[随信附带了物品: ${resObj.gift}]` });
+                gameState.inventory.push({ id: Date.now(), name: resObj.gift, desc: resObj.giftDesc || "信件附带", effect: resObj.giftEffect || "未知", amount: 1 });
+            }
+            openChat(id);
+        } catch (e) {
+            npc.chatHistory.push({ role: 'system', text: '信件损毁 (API解析失败)' });
+            openChat(id);
+        }
+    }
+
+    async function askMoney(id) {
+        const npc = gameState.npcs.find(n => n.id === id);
+        if (npc.lastAskMoneyTurn && (gameState.turn - npc.lastAskMoneyTurn < 10)) {
+            alert(`十周内只能成功要一次钱！(上次成功在第 ${npc.lastAskMoneyTurn} 周)`);
+            return;
+        }
+        npc.chatHistory.push({ role: 'user', text: "能支援我一点加隆吗？最近手头有点紧..." });
+        openChat(id);
+        
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) return;
+
+        const prompt = `你扮演《哈利波特》中的【${npc.name}】。玩家向你要钱。你的身份：${npc.desc}。对玩家好感度：${npc.relation} (0-100)。
+请根据人设决定是否给钱。返回JSON格式：{"agree": true/false, "reply": "你的回复"}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "user", content: prompt }], temperature: 0.7 })
+            });
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            const resObj = JSON.parse(replyText);
+            
+            npc.chatHistory.push({ role: 'npc', text: resObj.reply });
+            if (resObj.agree) {
+                npc.lastAskMoneyTurn = gameState.turn;
+                let g = Math.floor(Math.random() * 11);
+                let s = Math.floor(Math.random() * 21);
+                let n = Math.floor(Math.random() * 51);
+                let moneyStr = `${g}加隆 ${s}西可 ${n}纳特`;
+                npc.chatHistory.push({ type: 'redpack', title: `${npc.name} 的汇款`, amount: moneyStr });
+                gameState.main.assets = (gameState.main.assets || "") + `\n[信件汇款] +${moneyStr} (来自 ${npc.name})`;
+                updateUI();
+            }
+            openChat(id);
+        } catch (e) {
+            npc.chatHistory.push({ role: 'system', text: '信件损毁' });
+            openChat(id);
+        }
+    }
+
+    async function askMeet(id) {
+        const reason = prompt("请输入约见面的理由/事情：");
+        if (!reason) return;
+        const npc = gameState.npcs.find(n => n.id === id);
+        npc.chatHistory.push({ role: 'user', text: `我想约你见个面。理由：${reason}` });
+        openChat(id);
+        
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) return;
+
+        const promptStr = `你扮演《哈利波特》中的【${npc.name}】。玩家约你见面，理由是：“${reason}”。你的身份：${npc.desc}。对玩家好感度：${npc.relation} (0-100)。
+请根据人设决定是否答应。返回JSON格式：{"agree": true/false, "reply": "你的回复"}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "user", content: promptStr }], temperature: 0.7 })
+            });
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            const resObj = JSON.parse(replyText);
+            
+            npc.chatHistory.push({ role: 'npc', text: resObj.reply });
+            if (resObj.agree) {
+                npc.chatHistory.push({ type: 'system', text: `[约见成功，已记录至周日志]` });
+                gameState.main.log = (gameState.main.log || "") + `\n[约见] 成功约见 ${npc.name}。事由：${reason}`;
+                updateUI();
+            }
+            openChat(id);
+        } catch (e) {
+            npc.chatHistory.push({ role: 'system', text: '信件损毁' });
+            openChat(id);
+        }
+    }
+
+    function openGift(id) {
+        const npc = gameState.npcs.find(n => n.id === id);
+        if(!npc) return;
+        let html = `<div style="color:gray; font-size:12px; margin-bottom:10px;">请选择要赠送给 ${npc.name} 的物品：</div>`;
+        html += `<div style="max-height: 50vh; overflow-y: auto;">`;
+        if (gameState.inventory.length === 0) {
+            html += `<div style="text-align:center; color:gray; font-size:12px;">背包空空如也</div>`;
+        } else {
+            gameState.inventory.forEach(item => {
+                html += `
+                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight:bold; font-size:13px;">${item.name} <span style="color:gray; font-size:11px;">x${item.amount}</span></div>
+                        <div style="font-size:11px; color:gray;">${item.desc}</div>
+                    </div>
+                    <button class="btn btn-outline" style="width:auto; padding:4px 8px; margin:0; font-size:12px;" onclick="sendGift(${id}, ${item.id})">送出</button>
+                </div>`;
+            });
+        }
+        html += `</div>`;
+        openModal(`🎁 赠送礼物`, html, `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="showNPC(${id})">返回</button>`);
+    }
+
+    async function sendGift(npcId, itemId) {
+        const npc = gameState.npcs.find(n => n.id === npcId);
+        const item = gameState.inventory.find(i => i.id === itemId);
+        if(!npc || !item) return;
+        
+        item.amount--;
+        if(item.amount <= 0) gameState.inventory = gameState.inventory.filter(i => i.id !== itemId);
+        updateUI();
+        
+        document.getElementById('modalContent').innerHTML = `<div style="text-align:center; padding:20px;">猫头鹰正在运送礼物...</div>`;
+        
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) {
+            alert("未配置API，礼物已送出但无回应。");
+            showNPC(npcId); return;
+        }
+
+        const promptStr = `你扮演《哈利波特》中的【${npc.name}】。你的身份：${npc.desc}。
+玩家送给你一件礼物：【${item.name}】(描述：${item.desc})。
+请根据你的人设判断你是否喜欢这个礼物。如果是奇奇怪怪的东西（比如别人用过的魔杖、大粪弹等），你可能会觉得奇怪甚至生气。
+返回JSON格式：{"relationChange": 好感度变化数值(整数，可正可负可为0), "reply": "你收到礼物后的反应/回信"}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "user", content: promptStr }], temperature: 0.7 })
+            });
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            const resObj = JSON.parse(replyText);
+            
+            npc.relation += resObj.relationChange;
+            if(npc.relation > 100) npc.relation = 100;
+            if(npc.relation < -100) npc.relation = -100;
+            
+            if(!npc.chatHistory) npc.chatHistory = [];
+            npc.chatHistory.push({ type: 'system', text: `[赠送了 ${item.name}，好感度变化: ${resObj.relationChange > 0 ? '+'+resObj.relationChange : resObj.relationChange}]` });
+            npc.chatHistory.push({ role: 'npc', text: resObj.reply });
+            
+            updateUI();
+            openChat(npcId); 
+        } catch (e) {
+            alert("API解析失败，礼物已送出。");
+            showNPC(npcId);
+        }
+    }
+
+    // --- 地图与商店系统 ---
+    function openHogsmeade() {
+        let html = `
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn" onclick="openShop('蜂蜜公爵糖果店')">🍬 蜂蜜公爵糖果店</button>
+                <button class="btn" onclick="openShop('三把扫帚酒吧')">🍺 三把扫帚酒吧</button>
+                <button class="btn" onclick="openShop('猪头酒吧')">🐗 猪头酒吧</button>
+                <button class="btn" onclick="openShop('佐科笑话店')">🤡 佐科笑话店</button>
+                <button class="btn" onclick="openShop('风雅牌巫师服装店')">👗 风雅牌巫师服装店</button>
+                <button class="btn" onclick="openShop('奥利凡德魔杖店(分店)')">🪄 奥利凡德(分店)</button>
+            </div>
+        `;
+        const actionHtml = `<button class="btn btn-outline" id="refreshAllShopsBtn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="refreshAllShops()">刷新商品</button>`;
+        openModal("🍻 霍格莫德村", html, actionHtml);
+    }
+
+    const shopsData = {
+        '蜂蜜公爵糖果店': [
+            { name: '巧克力蛙', cost: '2 银西可', desc: '附赠一张随机巫师画片。', effect: '心情+5' },
+            { name: '比比多味豆', cost: '6 铜纳特', desc: '每一口都是一次冒险。', effect: '心情+2' }
+        ],
+        '三把扫帚酒吧': [
+            { name: '黄油啤酒', cost: '2 银西可', desc: '温暖人心的经典饮品。', effect: '体力+10, 心情+10' }
+        ],
+        '猪头酒吧': [
+            { name: '火焰威士忌', cost: '1 金加隆', desc: '非常烈，喉咙像吞了火炭。', effect: '心情+10, 健康-5' }
+        ],
+        '佐科笑话店': [
+            { name: '大粪弹', cost: '5 银西可', desc: '极度恶臭，恶作剧必备。', effect: '可用于中断某些敌对事件' }
+        ],
+        '风雅牌巫师服装店': [
+            { name: '高级天鹅绒斗篷', cost: '15 金加隆', desc: '非常华丽，出席舞会必备。', effect: '魅力+20' }
+        ],
+        '奥利凡德魔杖店(分店)': [
+            { name: '魔杖抛光剂', cost: '10 银西可', desc: '让你的魔杖焕然一新。', effect: '施法成功率微幅提升' }
+        ]
+    };
+
+    function openShop(shopName) {
+        const items = shopsData[shopName];
+        let html = `<div style="color:gray; font-size:12px; margin-bottom:10px; border-bottom:1px dashed var(--border-color); padding-bottom:5px;">当前资产: ${gameState.main.assets || '未知'}</div>`;
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; max-height:55vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
+        items.forEach(item => {
+            html += `
+                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div style="font-weight:bold; font-size:13px; color: var(--primary-color);">${item.name}</div>
+                        <div style="font-size:11px; color:gray; margin: 4px 0;">${item.desc}</div>
+                        <div style="font-size:11px; margin-bottom: 8px;">效果: ${item.effect}</div>
+                    </div>
+                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px;" onclick="buyItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')">购买 (${item.cost})</button>
+                </div>
+            `;
+        });
+        html += '</div>';
+        const actionHtml = `
+            <button class="btn btn-outline" id="refreshShopBtn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="refreshShop('${shopName}')">刷新商品</button>
+            <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="openHogsmeade()">返回</button>
+        `;
+        openModal(`🏪 ${shopName}`, html, actionHtml);
+    }
+
+    function buyItem(name, costStr, desc, effect) {
+        if (gameState.turn === 0) { alert("请先开启人生！"); return; }
+        let existingItem = gameState.inventory.find(i => i.name === name);
+        if (existingItem) existingItem.amount++;
+        else gameState.inventory.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: name, desc: desc, effect: effect, amount: 1 });
+        gameState.main.assets = (gameState.main.assets || "") + `\n[消费] -${costStr} (${name})`;
+        updateUI();
+        alert(`购买成功！\n获得了 ${name}。\n花费了 ${costStr}。`);
+    }
+
+    async function refreshShop(shopName) {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) { alert("请配置API！"); return; }
+        const btn = document.getElementById('refreshShopBtn');
+        if(btn) { btn.innerText = "进货中..."; btn.disabled = true; }
+        const currentItems = shopsData[shopName].map(i => i.name).join('、');
+        const systemPrompt = `你是一个《哈利波特》原著设定专家。请为霍格莫德的【${shopName}】生成2到3个符合原著设定的新商品。
+当前已有商品：${currentItems}。请绝对不要生成重复的商品。
+你必须且只能输出一个合法的JSON数组，不要包含任何Markdown标记。格式严格如下：
+[{"name": "商品名", "cost": "价格(如: 3 银西可)", "desc": "描述", "effect": "使用效果(如: 心情+5)"}]`;
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: `请为【${shopName}】进货。` }], temperature: 0.7 })
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim();
+            if(replyText.startsWith("```json")) replyText = replyText.replace(/^```json/, '');
+            if(replyText.startsWith("```")) replyText = replyText.replace(/^```/, '');
+            if(replyText.endsWith("```")) replyText = replyText.replace(/```$/, '');
+            const newItems = JSON.parse(replyText.trim());
+            if(Array.isArray(newItems)) {
+                shopsData[shopName] = shopsData[shopName].concat(newItems);
+                openShop(shopName); 
+            }
+        } catch (error) {
+            alert("刷新失败：" + error.message);
+            if(btn) { btn.innerText = "刷新商品"; btn.disabled = false; }
+        }
+    }
+
+    async function refreshAllShops() {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) { alert("请配置API！"); return; }
+        const btn = document.getElementById('refreshAllShopsBtn');
+        if(btn) { btn.innerText = "全面进货中..."; btn.disabled = true; }
+        let currentItemsInfo = "";
+        Object.keys(shopsData).forEach(shop => { currentItemsInfo += `【${shop}】已有: ${shopsData[shop].map(i => i.name).join('、')}\n`; });
+        const systemPrompt = `你是一个《哈利波特》原著设定专家。请为霍格莫德的所有商店分别生成1到2个符合原著设定的新商品。
+当前各商店已有商品如下，请绝对不要生成重复的商品：\n${currentItemsInfo}
+你必须且只能输出一个合法的JSON对象，不要包含任何Markdown标记。格式严格如下：
+{"蜂蜜公爵糖果店": [{"name": "商品名", "cost": "价格", "desc": "描述", "effect": "效果(如: 心情+5)"}], "三把扫帚酒吧": [...], "猪头酒吧": [...], "佐科笑话店": [...], "风雅牌巫师服装店": [...], "奥利凡德魔杖店(分店)": [...]}`;
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: "请为霍格莫德的所有商店全面进货。" }], temperature: 0.7 })
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim();
+            if(replyText.startsWith("```json")) replyText = replyText.replace(/^```json/, '');
+            if(replyText.startsWith("```")) replyText = replyText.replace(/^```/, '');
+            if(replyText.endsWith("```")) replyText = replyText.replace(/```$/, '');
+            const newItemsObj = JSON.parse(replyText.trim());
+            for (let shop in newItemsObj) {
+                if (shopsData[shop] && Array.isArray(newItemsObj[shop])) {
+                    shopsData[shop] = shopsData[shop].concat(newItemsObj[shop]);
+                }
+            }
+            alert("霍格莫德全面进货成功！");
+            if(btn) { btn.innerText = "刷新商品"; btn.disabled = false; }
+        } catch (error) {
+            alert("全面进货失败：" + error.message);
+            if(btn) { btn.innerText = "刷新商品"; btn.disabled = false; }
+        }
+    }
+
+    // --- 剧情控制逻辑 ---
+    function checkActionAllowed() {
+        if (gameState.main.status && gameState.main.status.stamina < 10) {
+            alert("快去吃东西！\n(体力少于10点，处于【体力不支】状态，无法行动)");
+            return false;
+        }
+        return true;
+    }
+
+    function saveCurrentToHistory() {
+        if (gameState.turn > 0) {
+            gameState.history[gameState.turn - 1] = JSON.parse(JSON.stringify({
+                main: gameState.main, story: gameState.story, inventory: gameState.inventory, npcs: gameState.npcs
+            }));
+        }
+    }
+
+    function loadFromHistory(targetTurn) {
+        const state = gameState.history[targetTurn - 1];
+        if (state) {
+            gameState.main = JSON.parse(JSON.stringify(state.main));
+            gameState.story = JSON.parse(JSON.stringify(state.story));
+            gameState.inventory = JSON.parse(JSON.stringify(state.inventory));
+            gameState.npcs = JSON.parse(JSON.stringify(state.npcs));
+        }
+    }
+
+    function prevWeek() {
+        if(gameState.turn <= 1) { alert("已经是第一周了！"); return; }
+        saveCurrentToHistory(); gameState.turn--; loadFromHistory(gameState.turn); updateUI();
+    }
+
+    function nextWeek() {
+        if(!gameState.maxTurn || gameState.turn >= gameState.maxTurn) { alert("已经是最新一周了！"); return; }
+        saveCurrentToHistory(); gameState.turn++; loadFromHistory(gameState.turn); updateUI();
+    }
+
+    function openCalendar() {
+        if (gameState.turn === 0) { alert("请先开启人生！"); return; }
+        saveCurrentToHistory();
+        let html = '<div style="display:flex; flex-direction:column; gap:10px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">';
+        const max = gameState.maxTurn || gameState.turn;
+        for (let i = 1; i <= max; i++) {
+            const isCurrent = (i === gameState.turn) ? 'background-color: var(--primary-color); color: white;' : '';
+            html += `<button class="btn btn-outline" style="margin:0; ${isCurrent}" onclick="jumpToWeek(${i})">第 ${i} 周</button>`;
+        }
+        html += '</div>';
+        document.getElementById('modalContent').style.display = 'none'; 
+        openModal("📅 霍格沃茨日历", html);
+        document.getElementById('modalContent').style.display = 'block'; 
+    }
+
+    function jumpToWeek(targetTurn) {
+        closeModal();
+        if (targetTurn === gameState.turn) return;
+        saveCurrentToHistory(); gameState.turn = targetTurn; loadFromHistory(gameState.turn); updateUI();
+    }
+
+    function regenerateWeek() {
+        if(!gameState.lastPrompt) { alert("没有可重新生成的记录！"); return; }
+        callAPI(gameState.lastPrompt, true);
+    }
+
+    function startGame() {
+        if(gameState.turn > 0) { if(!confirm("当前已有游戏进度，确定要重新开启人生吗？")) return; }
+        gameState.turn = 0; gameState.maxTurn = 0; gameState.history = [];
+        gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+        updateTraits();
+        callAPI("请根据设定随机生成初始身份（11岁，等待入学通知书），并开始第一周。请生成不少于3000字的细腻剧情。");
+        switchTab('story', document.querySelectorAll('.nav-item')[1]);
+    }
+
+    function selectOption(optText) {
+        if (!checkActionAllowed()) return;
+        saveCurrentToHistory();
+        gameState.history.length = gameState.turn; 
+        gameState.maxTurn = gameState.turn;
+        callAPI(`我选择了选项：【${optText}】。请推进下一周，生成不少于3000字的剧情，并更新我的主控面板、背包和社交状态。`);
+    }
+
+    function submitCustomAction() {
+        if (!checkActionAllowed()) return;
+        const input = document.getElementById('customActionInput');
+        const action = input.value.trim();
+        if(!action) { alert("请输入行动内容！"); return; }
+        input.value = '';
+        saveCurrentToHistory();
+        gameState.history.length = gameState.turn; 
+        gameState.maxTurn = gameState.turn;
+        callAPI(`我自主决定采取行动：【${action}】。请根据我的行动推进下一周，生成不少于3000字的剧情，并更新状态。`);
+    }
+
+    // --- API 调用 (后台生成，不阻塞) ---
+    async function callAPI(userPrompt, isRegenerate = false) {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+
+        if(!url || !key || !model) {
+            alert("请先在【设置】中配置API端口、密钥并拉取选择模型！");
+            switchTab('settings', document.querySelectorAll('.nav-item')[5]);
+            return;
+        }
+
+        gameState.lastPrompt = userPrompt;
+
+        document.getElementById('storyText').innerText = "大魔法师正在后台编织命运，请稍候...\n(您可以切换到其他页面查看信息，生成完毕后会自动更新)";
+        document.getElementById('storyOptions').innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">生成中...</div>`;
+
+        let systemPrompt = `你是一个完全符合《哈利波特》原著设定的文字养成游戏引擎。
+请严格遵守以下核心设定：
+${coreReferenceText}
+
+玩家当前人设：
+${gameState.characterLore || "无"}
+
+玩家导入的预设规则：
+${gameState.presets.map(p => p.name + ":\n" + p.content).join('\n\n') || "无"}
+
+当前游戏状态（JSON）：
+${JSON.stringify(gameState.main)}
+背包：${JSON.stringify(gameState.inventory)}
+社交：${JSON.stringify(gameState.npcs)}
+
+【重要数值与状态规则】
+1. 个人属性(attributes)和成绩(grades)平时不要随意增加！必须与剧情推进或背包物品使用严格挂钩。
+2. 个人状态(status)包含：magic(魔力), stamina(体力), mood(心情), health(健康)，范围0-100。
+3. 状态对剧情的强制影响：
+   - 如果 magic < 20，本周施法有极大概率失败或反噬。
+   - 如果 stamina < 20，本周极度疲劳，可能晕倒。
+   - 如果 mood < 20，本周极易遭遇倒霉事件。
+   - 如果 health < 20，本周必定生病，需要去校医院。
+   - 如果上述属性 > 80，则表现出极佳的正面状态。
+4. 你的剧情生成必须体现上述状态的影响！并且根据本周发生的事件，在返回的JSON中合理增减 status 的数值（例如：上课消耗体力/魔力，遇到好事增加心情，受伤减少健康）。
+5. 如果数值有提升或下降，必须在剧情文本(story.text)文末明确写出，例如：“上了一节魔药课 魔药学+10，体力-10”。
+
+【重要输出要求】
+你必须且只能输出一个合法的JSON对象，不要包含任何Markdown标记（如 \`\`\`json ），不要有任何前言后语。JSON格式必须严格如下：
+{
+  "main": {
+    "era": "时代背景", "time": "当前时间", "location": "当前地点", "weather": "天气", "news": "热点事件",
+    "name": "姓名", "blood": "血统", "age": "年龄", "appearance": "外貌", "family": "家族", "assets": "资产",
+    "wand": "魔杖", "talent": "天赋", "special": "特殊", "record": "档案",
+    "log": "周日常互动日志(正常文本记录，不要伪代码)",
+    "attributes": { "dada": 0, "darkArts": 0, "transfiguration": 0, "divination": 0, "potions": 0, "charms": 0 },
+    "status": { "magic": 100, "stamina": 100, "mood": 100, "health": 100 },
+    "grades": { "dada": 0, "charms": 0, "astronomy": 0, "potions": 0, "herbology": 0, "history": 0, "transfiguration": 0, "arithmancy": 0, "comc": 0, "divination": 0, "runes": 0, "muggle": 0 }
+  },
+  "story": {
+    "text": "本周的剧情描述，必须严格≥3000字，包含细腻的环境、心理、对话描写。必须体现当前状态的影响。如有数值变动需在文末注明。",
+    "options": ["选项1", "选项2", "选项3", "选项4", "选项5"]
+  },
+  "inventory": [
+    {"id": 1, "name": "物品名", "desc": "描述", "effect": "效果(如: 体力+10, 心情+5)", "amount": 1}
+  ],
+  "npcs": [
+    {"id": 1, "name": "NPC名", "house": "学院", "relation": 50, "desc": "描述"}
+  ]
+}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${key}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt }
+                    ],
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim();
+            
+            if(data.usage && data.usage.total_tokens) {
+                gameState.stats.totalTokens += data.usage.total_tokens;
+            }
+            gameState.stats.totalChars += replyText.length;
+
+            if(replyText.startsWith("```json")) replyText = replyText.replace(/^```json/, '');
+            if(replyText.startsWith("```")) replyText = replyText.replace(/^```/, '');
+            if(replyText.endsWith("```")) replyText = replyText.replace(/```$/, '');
+            replyText = replyText.trim();
+
+            try {
+                const parsedData = JSON.parse(replyText);
+                if(parsedData.main) {
+                    gameState.main = parsedData.main;
+                    if(!gameState.main.status) gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+                    updateTraits();
+                }
+                if(parsedData.story) gameState.story = parsedData.story;
+                if(parsedData.inventory) gameState.inventory = parsedData.inventory;
+                if(parsedData.npcs) gameState.npcs = parsedData.npcs;
+                
+                if (!isRegenerate) {
+                    gameState.turn++;
+                    gameState.maxTurn = gameState.turn;
+                }
+                saveCurrentToHistory(); 
+                
+                updateUI();
+                addLog("API调用", true, `成功生成第 ${gameState.turn} 周内容`);
+                
+                if(!document.getElementById('view-story').classList.contains('active')) {
+                    alert("✨ 新一周的命运已编织完毕，请前往【剧情】页面查看！");
+                }
+            } catch (parseErr) {
+                console.error("JSON解析失败:", replyText);
+                gameState.story.text = "【系统警告：大模型未返回标准JSON格式，以下为原始文本】\n\n" + replyText;
+                gameState.story.options = [];
+                updateUI();
+                addLog("API调用", false, "JSON解析失败，已降级显示纯文本");
+            }
+
+        } catch (error) {
+            gameState.story.text = "生成失败：" + error.message;
+            updateUI();
+            addLog("API调用", false, error.message);
+        }
+    }
+
+    // --- 设置与主题系统 ---
+    function toggleDarkMode() {
+        const isDark = document.getElementById('darkModeToggle').checked;
+        gameState.settings.theme = isDark ? 'dark' : 'light';
+        applySettings();
+    }
+
+    function setPrimaryColor(color, element) {
+        gameState.settings.primaryColor = color;
+        if(element) {
+            document.querySelectorAll('.color-dot').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+        }
+        applySettings();
+    }
+
+    function changeResolution() {
+        const val = document.getElementById('resolutionSelect').value;
+        const customDiv = document.getElementById('customResolutionDiv');
+        if (val === 'custom') {
+            customDiv.style.display = 'flex';
+        } else {
+            customDiv.style.display = 'none';
+            const [w, h] = val.split('x');
+            gameState.settings.resolution = { width: parseInt(w), height: parseInt(h) };
+            applySettings();
+        }
+    }
+
+    function applyCustomResolution() {
+        const w = parseInt(document.getElementById('customWidth').value);
+        const h = parseInt(document.getElementById('customHeight').value);
+        if (w >= 300 && h >= 400) {
+            gameState.settings.resolution = { width: w, height: h };
+            applySettings();
+        } else {
+            alert("请输入合理的宽高数值 (宽>=300, 高>=400)");
+        }
+    }
+
+    function applySettings() {
+        if (gameState.settings.theme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            document.getElementById('darkModeToggle').checked = true;
+        } else {
+            document.body.removeAttribute('data-theme');
+            document.getElementById('darkModeToggle').checked = false;
+        }
+        document.documentElement.style.setProperty('--primary-color', gameState.settings.primaryColor);
+        
+        if (!gameState.settings.resolution) {
+            gameState.settings.resolution = { width: 375, height: 550 };
+        }
+        const res = gameState.settings.resolution;
+        document.documentElement.style.setProperty('--app-width', `${res.width}px`);
+        document.documentElement.style.setProperty('--app-height', `${res.height}px`);
+        
+        const resText = document.getElementById('currentResolutionText');
+        if (resText) {
+            resText.innerText = `当前比例: ${res.width}x${res.height}px`;
+        }
+        
+        const select = document.getElementById('resolutionSelect');
+        if (select) {
+            const valStr = `${res.width}x${res.height}`;
+            let found = false;
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === valStr) {
+                    select.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) select.value = 'custom';
+            document.getElementById('customResolutionDiv').style.display = found ? 'none' : 'flex';
+        }
+    }
+
+    // --- 存档系统 ---
+    function exportSave() {
+        gameState.characterLore = document.getElementById('characterLore').value;
+        gameState.settings.apiUrl = document.getElementById('apiUrl').value;
+        gameState.settings.apiKey = document.getElementById('apiKey').value;
+        gameState.settings.apiModel = document.getElementById('apiModel').value;
+
+        try {
+            const jsonString = JSON.stringify(gameState);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.href = url;
+            dlAnchorElem.download = "hogwarts_save.json";
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            document.body.removeChild(dlAnchorElem);
+            
+            URL.revokeObjectURL(url); 
+            addLog("存档导出", true, "成功导出 JSON");
+        } catch (error) {
+            alert("导出失败：" + error.message);
+            addLog("存档导出", false, error.message);
+        }
+    }
+
+    function exportSaveTXT() {
+        gameState.characterLore = document.getElementById('characterLore').value;
+        gameState.settings.apiUrl = document.getElementById('apiUrl').value;
+        gameState.settings.apiKey = document.getElementById('apiKey').value;
+        gameState.settings.apiModel = document.getElementById('apiModel').value;
+
+        try {
+            const jsonString = JSON.stringify(gameState, null, 4);
+            const blob = new Blob([jsonString], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.href = url;
+            dlAnchorElem.download = "hogwarts_save.txt";
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            document.body.removeChild(dlAnchorElem);
+            
+            URL.revokeObjectURL(url); 
+            addLog("存档导出", true, "成功导出 TXT");
+        } catch (error) {
+            alert("导出失败：" + error.message);
+            addLog("存档导出", false, error.message);
+        }
+    }
+
+    function importSave(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                gameState = JSON.parse(e.target.result);
+                applySettings();
+                updateUI();
+                renderPresets();
+                document.getElementById('characterLore').value = gameState.characterLore || "";
+                document.getElementById('apiUrl').value = gameState.settings.apiUrl || "";
+                document.getElementById('apiKey').value = gameState.settings.apiKey || "";
+                
+                if(gameState.settings.apiModel) {
+                    const select = document.getElementById('apiModel');
+                    select.innerHTML = `<option value="${gameState.settings.apiModel}">${gameState.settings.apiModel}</option>`;
+                }
+                
+                alert("存档导入成功！");
+                addLog("存档导入", true, "成功加载存档");
+            } catch (err) {
+                alert("存档文件格式错误！请确保修改 TXT 时没有破坏 JSON 括号结构。");
+                addLog("存档导入", false, "JSON解析失败");
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    // --- 设定管理 ---
+    function toggleSettingView() {
+        const type = document.getElementById('settingType').value;
+        document.getElementById('characterSettingView').style.display = type === 'character' ? 'block' : 'none';
+        document.getElementById('presetSettingView').style.display = type === 'preset' ? 'block' : 'none';
+        document.getElementById('referenceSettingView').style.display = type === 'reference' ? 'block' : 'none';
+    }
+
+    function saveCharacterLore() {
+        gameState.characterLore = document.getElementById('characterLore').value;
+        alert("人设保存成功！");
+    }
+
+    function importPreset(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const newPreset = {
+                id: Date.now(),
+                name: file.name,
+                content: e.target.result
+            };
+            gameState.presets.push(newPreset);
+            renderPresets();
+            addLog("预设导入", true, `成功导入 ${file.name}`);
+        };
+        reader.readAsText(file);
+    }
+
+    function renderPresets() {
+        const list = document.getElementById('presetList');
+        list.innerHTML = '';
+        if(gameState.presets.length === 0) {
+            list.innerHTML = '<div style="color:gray; font-size:12px; text-align:center;">暂无预设文件</div>';
+            return;
+        }
+        gameState.presets.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.style.padding = '5px';
+            div.innerHTML = `
+                <span style="font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;" onclick="viewPreset(${p.id})">📄 ${p.name}</span>
+                <button class="btn btn-outline" style="padding: 2px 5px; font-size:12px; color:red; border-color:red; width:auto;" onclick="deletePreset(${p.id})">删除</button>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function viewPreset(id) {
+        const p = gameState.presets.find(x => x.id === id);
+        if(p) openModal(`预设: ${p.name}`, p.content);
+    }
+
+    function deletePreset(id) {
+        gameState.presets = gameState.presets.filter(x => x.id !== id);
+        renderPresets();
+    }
+
+    // --- API 模型拉取 ---
+    function addLog(action, success, detail) {
+        const logBox = document.getElementById('apiLog');
+        const time = new Date().toLocaleTimeString();
+        const color = success ? '#0f0' : '#f00';
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `<span style="color:gray">[${time}]</span> ${action}: <span style="color:${color}">${success ? '成功' : '失败'}</span> - ${detail}`;
+        logBox.prepend(entry);
+    }
+
+    async function fetchModels() {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const select = document.getElementById('apiModel');
+        
+        if(!url) {
+            addLog("拉取模型", false, "API端口为空");
+            return;
+        }
+
+        select.innerHTML = '<option>拉取中...</option>';
+        addLog("拉取模型", true, `请求 ${url}/v1/models`);
+
+        try {
+            const response = await fetch(`${url}/v1/models`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${key}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            select.innerHTML = '';
+            
+            if(data.data && Array.isArray(data.data)) {
+                data.data.forEach(model => {
+                    const opt = document.createElement('option');
+                    opt.value = model.id;
+                    opt.innerText = model.id;
+                    select.appendChild(opt);
+                });
+                if(data.data.length > 0) {
+                    gameState.settings.apiModel = data.data[0].id;
+                }
+                select.onchange = (e) => { gameState.settings.apiModel = e.target.value; };
+                
+                addLog("拉取模型", true, `成功获取 ${data.data.length} 个模型`);
+            } else {
+                throw new Error("返回数据格式不符合OpenAI规范");
+            }
+        } catch (error) {
+            select.innerHTML = '<option value="">拉取失败</option>';
+            addLog("拉取模型", false, error.message);
+        }
+    }
+</script>
+
+</body>
+</html>            height: 100vh;
             height: 100dvh;
             overflow: hidden;
             padding-top: 10px;
