@@ -9,6 +9,34 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="霍格沃茨">
     <title>霍格沃茨模拟器</title>
+    
+    <!-- 苹果桌面图标 -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7imqE8L3RleHQ+PC9zdmc+">
+    <!-- 动态注入 Manifest (实现全屏的核心) -->
+    <link rel="manifest" id="manifest-link">
+    <script>
+        const manifestJSON = {
+            "name": "霍格沃茨：魔法觉醒",
+            "short_name": "霍格沃茨",
+            "start_url": window.location.pathname,
+            "display": "standalone",
+            "background_color": "#333333",
+            "theme_color": "#000000",
+            "icons": [{
+                "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7imqE8L3RleHQ+PC9zdmc+",
+                "sizes": "192x192",
+                "type": "image/svg+xml"
+            }, {
+                "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7imqE8L3RleHQ+PC9zdmc+",
+                "sizes": "512x512",
+                "type": "image/svg+xml"
+            }]
+        };
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('manifest-link').href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifestJSON));
+        });
+    </script>
+
     <style>
         /* 基础与主题变量 */
         :root {
