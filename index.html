@@ -9,32 +9,53 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="霍格沃茨">
     <title>霍格沃茨模拟器</title>
-    
-    <!-- 苹果桌面图标 -->
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7imqE8L3RleHQ+PC9zdmc+">
-    <!-- 动态注入 Manifest (实现全屏的核心) -->
+    <!-- 动态注入 Manifest 和 Service Worker (实现 PWA 桌面安装的核心) -->
     <link rel="manifest" id="manifest-link">
     <script>
+        // 1. 动态生成并注入 Manifest
         const manifestJSON = {
-            "name": "霍格沃茨：魔法觉醒",
+            "name": "霍格沃茨模拟器",
             "short_name": "霍格沃茨",
-            "start_url": window.location.pathname,
+            "start_url": ".",
             "display": "standalone",
             "background_color": "#333333",
             "theme_color": "#000000",
             "icons": [{
                 "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7imqE8L3RleHQ+PC9zdmc+",
                 "sizes": "192x192",
-                "type": "image/svg+xml"
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
             }, {
                 "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7imqE8L3RleHQ+PC9zdmc+",
                 "sizes": "512x512",
-                "type": "image/svg+xml"
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
             }]
         };
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('manifest-link').href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifestJSON));
-        });
+        // 使用 Blob URL 更符合 Chrome 的标准识别机制
+        const manifestBlob = new Blob([JSON.stringify(manifestJSON)], { type: 'application/json' });
+        document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+
+        // 2. 动态生成并注册 Service Worker (这是触发浏览器"安装"按钮的必备条件)
+        if ('serviceWorker' in navigator) {
+            // 简单的 SW 脚本，仅作伪装拦截以通过 Chrome 的 PWA 可安装性检查
+            const swCode = `
+                self.addEventListener('install', (e) => { self.skipWaiting(); });
+                self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
+                self.addEventListener('fetch', (e) => {
+                    // 放行所有请求，离线时降级处理以满足 PWA 要求
+                    e.respondWith(fetch(e.request).catch(() => new Response('请检查网络连接...')));
+                });
+            `;
+            const swBlob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(swBlob);
+            
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(swUrl)
+                    .then(reg => console.log('✅ PWA ServiceWorker 注册成功，应用已支持安装到桌面!'))
+                    .catch(err => console.error('❌ ServiceWorker 注册失败:', err));
+            });
+        }
     </script>
 
     <style>
