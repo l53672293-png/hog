@@ -515,11 +515,11 @@
             <!-- 游戏控制 -->
             <div class="card settings-group" style="border-left-color: #990000; margin-bottom: 30px;">
                 <h4>🚀 游戏控制</h4>
-                <button class="btn" style="background-color: #990000; text-align: center; font-size: 16px; padding: 12px; font-weight: bold;" onclick="startGame()">✨ 开启 / 重置人生</button>
-                <div style="font-size: 12px; color: gray; text-align: center; margin-top: 5px;">点击将清空当前进度并重新生成初始身份</div>
+                <button class="btn" style="background-color: #990000; text-align: center; font-size: 16px; padding: 12px; font-weight: bold; margin-bottom: 5px;" onclick="startGame()">✨ 开启 / 重置人生</button>
+                <div style="font-size: 12px; color: gray; text-align: center; margin-bottom: 15px;">点击将清空当前进度并重新生成初始身份</div>
+                <button class="btn btn-outline" style="color: #990000; border-color: #990000; text-align: center; width: 100%;" onclick="confirmClearData()">🗑️ 清除所有本地数据</button>
             </div>
-        </div>
-    </div>
+
 
     <!-- 底部导航 -->
     <div class="nav-bar">
@@ -2281,6 +2281,26 @@ ${JSON.stringify(gameState.main)}
         };
         reader.readAsText(file);
         event.target.value = '';
+    }
+
+    // --- 数据清除系统 ---
+    function confirmClearData() {
+        const content = "<div style='color:#990000; text-align:center; font-weight:bold; margin: 10px 0;'>⚠️ 警告：此操作将永久删除本地所有存档进度、人设记录和 API 配置！<br><br>一旦清除无法恢复，确定要继续吗？</div>";
+        const actions = `
+            <button class="btn btn-outline" style="width: auto; padding: 4px 12px; font-size: 12px; margin: 0; color: gray; border-color: gray;" onclick="closeModal()">取消</button>
+            <button class="btn" style="width: auto; padding: 4px 12px; font-size: 12px; margin: 0; background-color: #990000; border: none;" onclick="executeClearData()">确定清除</button>
+        `;
+        // 复用已有的通用模态框
+        openModal("🗑️ 清除数据确认", content, actions);
+    }
+
+    function executeClearData() {
+        // 清除浏览器的 LocalStorage
+        localStorage.removeItem('hogwarts_save_data');
+        closeModal();
+        alert("🧹 所有本地数据已成功清除！\n页面即将重新加载。");
+        // 刷新页面，让所有数据变量彻底复原
+        location.reload();
     }
 
     // --- 设定管理 ---
