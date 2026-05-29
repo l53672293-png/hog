@@ -1063,6 +1063,7 @@ c.多人交互对话
 以上所有文档内容和补充内容都必须存档录入！必须存档录入！重点标红！`;
 
     // --- 游戏核心数据状态 (初始全空) ---
+    // --- 游戏核心数据状态 (初始全空) ---
     let gameState = {
         turn: 0,
         maxTurn: 0,
@@ -1086,102 +1087,24 @@ c.多人交互对话
         settings: { theme: "light", primaryColor: "#000000", apiUrl: "https://api.openai.com", apiKey: "", apiModel: "", resolution: { width: 375, height: 550 } }
     };
 
-    // 状态词条库
-    const traitsDB = {
-        "体力不支": { type: "debuff", desc: "体力少于10点。你饿得头晕眼花，连举起魔杖的力气都没有了。无法进行任何行动，快去吃东西！" },
-        "极度疲劳": { type: "debuff", desc: "体力少于20点。双腿像灌了铅，有概率在行动中晕倒。" },
-        "精力旺盛": { type: "buff", desc: "体力高于80点。感觉有用不完的力气，行动效率极高。" },
-        "魔力枯竭": { type: "debuff", desc: "魔力少于20点。感觉身体被掏空，施展咒语有极大概率失败甚至引发反噬。" },
-        "魔力充沛": { type: "buff", desc: "魔力高于80点。魔杖在你手中嗡嗡作响，施法威力大增。" },
-        "抑郁寡欢": { type: "debuff", desc: "心情少于20点。看什么都不顺眼，极易遭遇倒霉事件。" },
-        "厄运缠身": { type: "debuff", desc: "心情少于10点。喝水都能塞牙缝，皮皮鬼最喜欢捉弄现在的你。" },
-        "心情愉悦": { type: "buff", desc: "心情高于80点。笑容满面，好运连连，社交时更容易获得好感。" },
-        "幸运眷顾": { type: "buff", desc: "心情高于95点。福灵剂般的效果，心想事成。" },
-        "感染风寒": { type: "debuff", desc: "健康少于20点。不停地打喷嚏，庞弗雷夫人建议你立刻去校医院。" },
-        "虚弱不堪": { type: "debuff", desc: "健康少于10点。必须卧床休息，否则随时可能倒下。" },
-        "气色红润": { type: "buff", desc: "健康高于80点。免疫力极强，几乎不会生病。" },
-        "饱腹": { type: "buff", desc: "刚刚享用过美食，体力恢复速度加快。" },
-        "饥肠辘辘": { type: "debuff", desc: "体力少于40点。肚子咕咕叫，注意力开始分散。" },
-        "专注": { type: "buff", desc: "学习和阅读效率大幅提升。" },
-        "走神": { type: "debuff", desc: "心情少于40点。上课时总是盯着窗外发呆。" },
-        "灵感闪现": { type: "buff", desc: "魔力与心情双高时触发，容易领悟新魔咒。" },
-        "魔药中毒": { type: "debuff", desc: "乱吃东西或魔药课事故导致，健康持续下降。" },
-        "精神焕发": { type: "buff", desc: "睡眠充足，全属性微幅提升。" },
-        "筋疲力尽": { type: "debuff", desc: "连续高强度行动导致，需要立刻休息。" }
-    };
-
-    // 自动更新状态词条
-    function updateTraits() {
-        let s = gameState.main.status;
-        if (!s) return;
-        let t = new Set(gameState.main.traits || []);
-        
-        if(s.stamina < 10) t.add("体力不支"); else t.delete("体力不支");
-        if(s.stamina < 20 && s.stamina >= 10) t.add("极度疲劳"); else t.delete("极度疲劳");
-        if(s.stamina < 40 && s.stamina >= 20) t.add("饥肠辘辘"); else t.delete("饥肠辘辘");
-        if(s.stamina > 80) t.add("精力旺盛"); else t.delete("精力旺盛");
-        
-        if(s.magic < 20) t.add("魔力枯竭"); else t.delete("魔力枯竭");
-        if(s.magic > 80) t.add("魔力充沛"); else t.delete("魔力充沛");
-        
-        if(s.mood < 10) t.add("厄运缠身"); else t.delete("厄运缠身");
-        if(s.mood < 20 && s.mood >= 10) t.add("抑郁寡欢"); else t.delete("抑郁寡欢");
-        if(s.mood < 40 && s.mood >= 20) t.add("走神"); else t.delete("走神");
-        if(s.mood > 80 && s.mood <= 95) t.add("心情愉悦"); else t.delete("心情愉悦");
-        if(s.mood > 95) t.add("幸运眷顾"); else t.delete("幸运眷顾");
-        
-        if(s.health < 10) t.add("虚弱不堪"); else t.delete("虚弱不堪");
-        if(s.health < 20 && s.health >= 10) t.add("感染风寒"); else t.delete("感染风寒");
-        if(s.health > 80) t.add("气色红润"); else t.delete("气色红润");
-
-        if(s.magic > 60 && s.mood > 60) t.add("灵感闪现"); else t.delete("灵感闪现");
-
-        gameState.main.traits = Array.from(t);
-    }
-
-    // 解析物品效果并应用到状态
-    function applyEffectToStatus(effectStr) {
-        if (!effectStr) return false;
-        const regex = /(魔力|体力|心情|健康)\s*([+-]\s*\d+)/g;
-        let match;
-        let s = gameState.main.status;
-        if (!s) return false;
-        let changed = false;
-        while ((match = regex.exec(effectStr)) !== null) {
-            let attr = match[1];
-            let val = parseInt(match[2].replace(/\s/g, ''));
-            if(attr === '魔力') s.magic = Math.min(100, Math.max(0, s.magic + val));
-            if(attr === '体力') s.stamina = Math.min(100, Math.max(0, s.stamina + val));
-            if(attr === '心情') s.mood = Math.min(100, Math.max(0, s.mood + val));
-            if(attr === '健康') s.health = Math.min(100, Math.max(0, s.health + val));
-            changed = true;
-        }
-        if(changed) updateTraits();
-        return changed;
-    }
-
-    // --- 初始化 ---
-    // --- 本地自动存档系统 (LocalStorage) ---
-    function autoSaveToLocal() {
+    // --- 本地自动存档系统 ---
+    function saveDataToLocal() {
         try {
-            // 每次状态改变时自动保存到浏览器本地
-            localStorage.setItem('hogwarts_auto_save', JSON.stringify(gameState));
+            localStorage.setItem('hogwarts_save_data', JSON.stringify(gameState));
         } catch (e) {
-            console.warn("本地自动存档失败:", e);
+            console.warn("自动保存失败:", e);
         }
     }
 
-    function loadFromLocal() {
+    function loadDataFromLocal() {
         try {
-            const savedData = localStorage.getItem('hogwarts_auto_save');
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                // 恢复数据
-                gameState = parsedData;
+            const data = localStorage.getItem('hogwarts_save_data');
+            if (data) {
+                gameState = JSON.parse(data);
                 return true;
             }
         } catch (e) {
-            console.warn("读取本地存档失败:", e);
+            console.warn("读取存档失败:", e);
         }
         return false;
     }
@@ -1190,13 +1113,14 @@ c.多人交互对话
     window.onload = () => {
         document.getElementById('referenceText').value = coreReferenceText;
         
-        // 尝试读取本地自动存档
-        const hasLocalSave = loadFromLocal();
+        // 1. 优先读取本地自动存档
+        const hasSave = loadDataFromLocal();
         
+        // 2. 应用设置与渲染界面
         applySettings();
         updateUI();
         
-        // 恢复设置面板的输入框状态
+        // 3. 恢复设置面板的输入框状态
         document.getElementById('characterLore').value = gameState.characterLore || "";
         document.getElementById('apiUrl').value = gameState.settings.apiUrl || "";
         document.getElementById('apiKey').value = gameState.settings.apiKey || "";
@@ -1204,12 +1128,7 @@ c.多人交互对话
             const select = document.getElementById('apiModel');
             select.innerHTML = `<option value="${gameState.settings.apiModel}">${gameState.settings.apiModel}</option>`;
         }
-        
         renderPresets();
-
-        if (hasLocalSave) {
-            addLog("系统", true, "已自动恢复上次游玩进度");
-        }
     };
 
     function getGradeLetter(score) {
@@ -1372,6 +1291,9 @@ c.多人交互对话
             document.getElementById('stat-tokens').innerText = gameState.stats.totalTokens;
             document.getElementById('stat-chars').innerText = gameState.stats.totalChars;
         }
+
+        // 每次UI更新完毕后，执行自动保存
+        saveDataToLocal();
     }
 
     // --- 导航与模态框 ---
