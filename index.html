@@ -396,10 +396,16 @@
 
         <!-- 背包界面 -->
         <div id="view-inventory" class="view">
+            <div class="card" style="margin-bottom: 10px; padding: 10px 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold;">💰 资产余额</span>
+                    <span id="inventory-money" style="font-size: 13px; color: #CC9900; font-weight: bold;">0 金加隆 0 银西可 0 铜纳特</span>
+                </div>
+            </div>
             <div class="card">
-                <div class="card-title">🎒 物品栏 (交互触发)</div>
+                <div class="card-title">🎒 物品栏</div>
                 <div id="inventoryList">
-                    <div style="color:gray; text-align:center; font-size:12px; padding:10px;">空空如也</div>
+                    <!-- 动态渲染分类 -->
                 </div>
             </div>
         </div>
@@ -1334,18 +1340,54 @@ c.多人交互对话
             optContainer.innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">暂无选项</div>`;
         }
 
+        // 解析资产显示金钱
+        const moneyEl = document.getElementById('inventory-money');
+        if (gameState.main.assets) {
+            let match = gameState.main.assets.match(/(\d+)\s*金?加隆.*?(\d+)\s*银?西可.*?(\d+)\s*铜?纳特/);
+            if (match) moneyEl.innerText = `${match[1]}金加隆 ${match[2]}银西可 ${match[3]}铜纳特`;
+            else {
+                let simpleMatch = gameState.main.assets.match(/(\d+)\s*金?加隆/);
+                if (simpleMatch) moneyEl.innerText = `${simpleMatch[1]} 金加隆 (详情见巫师档案)`;
+                else moneyEl.innerText = "详情见巫师档案";
+            }
+        } else {
+            moneyEl.innerText = "0 金加隆 0 银西可 0 铜纳特";
+        }
+
         const invList = document.getElementById('inventoryList');
         invList.innerHTML = '';
+        
+        // 智能分类算法：判断是否为收藏品
+        const isCollectible = (item) => {
+            const n = item.name || "";
+            const e = item.effect || "";
+            return n.includes("画片") || n.includes("魔杖") || n.includes("通知书") || n.includes("信") || n.includes("照片") || n.includes("徽章") || n.includes("衣服") || n.includes("斗篷") || e.includes("收藏") || e.includes("不可使用") || e.includes("被动") || e.includes("装备");
+        };
+
         if(gameState.inventory.length === 0) {
             invList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">空空如也</div>';
         } else {
-            gameState.inventory.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `<span>${item.name}</span> <span style="color:gray;">x${item.amount}</span>`;
-                div.onclick = () => showItem(item.id);
-                invList.appendChild(div);
-            });
+            const consumables = gameState.inventory.filter(i => !isCollectible(i));
+            const collectibles = gameState.inventory.filter(i => isCollectible(i));
+
+            const renderCategory = (title, items, icon, isOpen) => {
+                if (items.length === 0) return '';
+                let html = `<div class="social-category">
+                    <div class="social-category-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                        <span>${icon} ${title} (${items.length})</span><span>▼</span>
+                    </div>
+                    <div class="social-category-content ${isOpen ? 'open' : ''}">`;
+                items.forEach(item => {
+                    html += `<div class="list-item" onclick="showItem('${item.id}')">
+                        <span>${item.name}</span> <span style="color:gray; font-size: 12px;">x${item.amount}</span>
+                    </div>`;
+                });
+                html += `</div></div>`;
+                return html;
+            };
+
+            invList.innerHTML += renderCategory("消耗品", consumables, "🧪", true);
+            invList.innerHTML += renderCategory("收藏品 (含装备/信件等)", collectibles, "💎", false);
         }
 
         const socList = document.getElementById('socialList');
@@ -1423,12 +1465,20 @@ c.多人交互对话
     function showItem(id) {
         const item = gameState.inventory.find(i => i.id == id);
         if(!item) return;
-        const content = `描述：\n${item.desc}\n\n属性：\n${item.effect}\n\n拥有数量：${item.amount}`;
+        const content = `描述：\n${item.desc}\n\n效果/属性：\n${item.effect}\n\n拥有数量：${item.amount}`;
         let action = '';
-        if (item.name.includes("画片") || item.name.includes("魔杖")) {
-            action = `<span style="color:gray; font-size:12px; margin-right:10px; align-self:center;">[仅供收藏/装备，不可使用]</span>`;
+        
+        // 智能分类算法 (同步)
+        const isCollectible = (i) => {
+            const n = i.name || "";
+            const e = i.effect || "";
+            return n.includes("画片") || n.includes("魔杖") || n.includes("通知书") || n.includes("信") || n.includes("照片") || n.includes("徽章") || n.includes("衣服") || n.includes("斗篷") || e.includes("收藏") || e.includes("不可使用") || e.includes("被动") || e.includes("装备");
+        };
+
+        if (isCollectible(item)) {
+            action = `<span style="color:gray; font-size:12px; margin-right:10px; align-self:center;">[收藏品/特殊道具，不可使用]</span>`;
         } else {
-            action = `<button class="btn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="useItem('${item.id}')">交互/使用</button>`;
+            action = `<button class="btn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="useItem('${item.id}')">使用</button>`;
         }
         openModal(item.name, content, action);
     }
@@ -1601,7 +1651,7 @@ c.多人交互对话
             alert(`十周内只能成功要一次钱！(上次成功在第 ${npc.lastAskMoneyTurn} 周)`);
             return;
         }
-        npc.chatHistory.push({ role: 'user', text: "能支援我一点加隆吗？最近手头有点紧..." });
+        npc.chatHistory.push({ role: 'user', text: "来财来财" });
         openChat(id);
         
         const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
@@ -1764,60 +1814,124 @@ c.多人交互对话
         openModal("🍻 霍格莫德村", html, actionHtml);
     }
 
+    // --- 魔法世界货币换算系统 ---
+    function getMoneyInKnuts(assetsStr) {
+        if (!assetsStr) return 0;
+        let total = 0;
+        let gMatch = assetsStr.match(/(\d+)\s*金?加隆/);
+        let sMatch = assetsStr.match(/(\d+)\s*银?西可/);
+        let nMatch = assetsStr.match(/(\d+)\s*铜?纳特/);
+        if (gMatch) total += parseInt(gMatch[1]) * 493; // 1加隆 = 17西可*29纳特 = 493纳特
+        if (sMatch) total += parseInt(sMatch[1]) * 29;  // 1西可 = 29纳特
+        if (nMatch) total += parseInt(nMatch[1]);
+        return total;
+    }
+
+    function knutsToString(knuts) {
+        let g = Math.floor(knuts / 493);
+        knuts %= 493;
+        let s = Math.floor(knuts / 29);
+        let n = knuts % 29;
+        return `${g}金加隆 ${s}银西可 ${n}铜纳特`;
+    }
+
+    function deductMoney(costStr) {
+        let costKnuts = getMoneyInKnuts(costStr);
+        if (costKnuts === 0) return true; // 免费物品
+        let currentKnuts = getMoneyInKnuts(gameState.main.assets);
+        if (currentKnuts < costKnuts) return false; // 钱不够
+        
+        let newKnuts = currentKnuts - costKnuts;
+        let newStr = knutsToString(newKnuts);
+        
+        // 更新巫师档案里的资产字符串，保持整洁
+        if (!gameState.main.assets) gameState.main.assets = "";
+        let cleanAssets = gameState.main.assets.replace(/\[余额\][^\n]*\n?/, '').trim();
+        cleanAssets = cleanAssets.replace(/\d+\s*金?加隆/g, '').replace(/\d+\s*银?西可/g, '').replace(/\d+\s*铜?纳特/g, '').replace(/,/g, '').trim();
+        gameState.main.assets = `[余额] ${newStr}\n` + cleanAssets;
+        return true;
+    }
+
+    // --- 商店数据 (增加库存 stock) ---
     const shopsData = {
         '蜂蜜公爵糖果店': [
-            { name: '巧克力蛙', cost: '2 银西可', desc: '附赠一张随机巫师画片。', effect: '心情+5' },
-            { name: '比比多味豆', cost: '6 铜纳特', desc: '每一口都是一次冒险。', effect: '心情+2' }
+            { name: '巧克力蛙', cost: '2 银西可', desc: '附赠一张随机巫师画片。', effect: '心情+5', stock: 10 },
+            { name: '比比多味豆', cost: '6 铜纳特', desc: '每一口都是一次冒险。', effect: '心情+2', stock: 20 }
         ],
         '三把扫帚酒吧': [
-            { name: '黄油啤酒', cost: '2 银西可', desc: '温暖人心的经典饮品。', effect: '体力+10, 心情+10' }
+            { name: '黄油啤酒', cost: '2 银西可', desc: '温暖人心的经典饮品。', effect: '体力+10, 心情+10', stock: 15 }
         ],
         '猪头酒吧': [
-            { name: '火焰威士忌', cost: '1 金加隆', desc: '非常烈，喉咙像吞了火炭。', effect: '心情+10, 健康-5' }
+            { name: '火焰威士忌', cost: '1 金加隆', desc: '非常烈，喉咙像吞了火炭。', effect: '心情+10, 健康-5', stock: 5 }
         ],
         '佐科笑话店': [
-            { name: '大粪弹', cost: '5 银西可', desc: '极度恶臭，恶作剧必备。', effect: '可用于中断某些敌对事件' }
+            { name: '大粪弹', cost: '5 银西可', desc: '极度恶臭，恶作剧必备。', effect: '可用于中断某些敌对事件', stock: 8 }
         ],
         '风雅牌巫师服装店': [
-            { name: '高级天鹅绒斗篷', cost: '15 金加隆', desc: '非常华丽，出席舞会必备。', effect: '魅力+20' }
+            { name: '高级天鹅绒斗篷', cost: '15 金加隆', desc: '非常华丽，出席舞会必备。', effect: '魅力+20', stock: 1 }
         ],
         '奥利凡德魔杖店(分店)': [
-            { name: '魔杖抛光剂', cost: '10 银西可', desc: '让你的魔杖焕然一新。', effect: '施法成功率微幅提升' }
+            { name: '魔杖抛光剂', cost: '10 银西可', desc: '让你的魔杖焕然一新。', effect: '施法成功率微幅提升', stock: 3 }
         ]
     };
 
     function openShop(shopName) {
         const items = shopsData[shopName];
-        let html = `<div style="color:gray; font-size:12px; margin-bottom:10px; border-bottom:1px dashed var(--border-color); padding-bottom:5px;">当前资产: ${gameState.main.assets || '未知'}</div>`;
+        let currentMoneyStr = knutsToString(getMoneyInKnuts(gameState.main.assets));
+        let html = `<div style="color:#CC9900; font-weight:bold; font-size:13px; margin-bottom:10px; border-bottom:1px dashed var(--border-color); padding-bottom:5px;">当前余额: ${currentMoneyStr}</div>`;
         html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; max-height:55vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
+        
         items.forEach(item => {
+            let isSoldOut = item.stock <= 0;
+            let btnText = isSoldOut ? "已售罄" : `购买 (${item.cost})`;
+            let btnStyle = isSoldOut ? "background-color: gray; color: white; border: none; cursor: not-allowed;" : "";
+            
             html += `
-                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; opacity: ${isSoldOut ? '0.6' : '1'};">
                     <div>
-                        <div style="font-weight:bold; font-size:13px; color: var(--primary-color);">${item.name}</div>
+                        <div style="font-weight:bold; font-size:13px; color: var(--primary-color); display:flex; justify-content:space-between;">
+                            <span>${item.name}</span>
+                            <span style="font-size:11px; color:gray; font-weight:normal;">剩 ${item.stock}件</span>
+                        </div>
                         <div style="font-size:11px; color:gray; margin: 4px 0;">${item.desc}</div>
                         <div style="font-size:11px; margin-bottom: 8px;">效果: ${item.effect}</div>
                     </div>
-                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px;" onclick="buyItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')">购买 (${item.cost})</button>
+                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px; ${btnStyle}" 
+                            ${isSoldOut ? 'disabled' : `onclick="buyItem('${shopName}', '${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')"`}>
+                        ${btnText}
+                    </button>
                 </div>
             `;
         });
         html += '</div>';
         const actionHtml = `
-            <button class="btn btn-outline" id="refreshShopBtn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="refreshShop('${shopName}')">刷新商品</button>
-            <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="openHogsmeade()">返回</button>
+            <button class="btn btn-outline" id="refreshShopBtn" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="refreshShop('${shopName}')">进货刷新</button>
+            <button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="openHogsmeade()">返回街区</button>
         `;
         openModal(`🏪 ${shopName}`, html, actionHtml);
     }
 
-    function buyItem(name, costStr, desc, effect) {
+    function buyItem(shopName, itemName, costStr, desc, effect) {
         if (gameState.turn === 0) { alert("请先开启人生！"); return; }
-        let existingItem = gameState.inventory.find(i => i.name === name);
+        
+        let shop = shopsData[shopName];
+        let itemObj = shop.find(i => i.name === itemName);
+        if (!itemObj || itemObj.stock <= 0) { alert("该商品已售罄！"); return; }
+
+        if (!deductMoney(costStr)) {
+            alert(`金币不足！\n你需要: ${costStr}\n快去信件里找人要点钱，或者等待每周发零花钱。`);
+            return;
+        }
+
+        itemObj.stock--; // 扣减库存
+        
+        let existingItem = gameState.inventory.find(i => i.name === itemName);
         if (existingItem) existingItem.amount++;
-        else gameState.inventory.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: name, desc: desc, effect: effect, amount: 1 });
-        gameState.main.assets = (gameState.main.assets || "") + `\n[消费] -${costStr} (${name})`;
+        else gameState.inventory.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: itemName, desc: desc, effect: effect, amount: 1 });
+        
         updateUI();
-        alert(`购买成功！\n获得了 ${name}。\n花费了 ${costStr}。`);
+        openShop(shopName); // 刷新界面库存和余额
+        alert(`购买成功！\n获得了 ${itemName}。\n消耗了 ${costStr}。`);
     }
 
     async function refreshShop(shopName) {
@@ -1845,12 +1959,14 @@ c.多人交互对话
             if(replyText.endsWith("```")) replyText = replyText.replace(/```$/, '');
             const newItems = JSON.parse(replyText.trim());
             if(Array.isArray(newItems)) {
+                // 给 AI 生成的新商品赋随机库存 1 ~ 5 件
+                newItems.forEach(item => item.stock = Math.floor(Math.random() * 5) + 1);
                 shopsData[shopName] = shopsData[shopName].concat(newItems);
                 openShop(shopName); 
             }
         } catch (error) {
             alert("刷新失败：" + error.message);
-            if(btn) { btn.innerText = "刷新商品"; btn.disabled = false; }
+            if(btn) { btn.innerText = "进货刷新"; btn.disabled = false; }
         }
     }
 
@@ -1881,6 +1997,8 @@ c.多人交互对话
             const newItemsObj = JSON.parse(replyText.trim());
             for (let shop in newItemsObj) {
                 if (shopsData[shop] && Array.isArray(newItemsObj[shop])) {
+                    // 给批量生成的新商品赋随机库存
+                    newItemsObj[shop].forEach(item => item.stock = Math.floor(Math.random() * 5) + 1);
                     shopsData[shop] = shopsData[shop].concat(newItemsObj[shop]);
                 }
             }
