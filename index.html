@@ -1296,7 +1296,6 @@ c.多人交互对话
 
         document.getElementById('mc-era').innerText = limitText(m.era);
         
-        // 让主控时间强制与大地图时间同步
         if (gameState.mapData) {
             let hh = gameState.mapData.hours.toString().padStart(2, '0');
             let mm = gameState.mapData.minutes.toString().padStart(2, '0');
@@ -1331,8 +1330,7 @@ c.多人交互对话
             document.getElementById('attributes-container').innerHTML = attrHtml;
         }
 
-                if (m.status) {
-            // 初始化声望
+        if (m.status) {
             if (m.status.reputation === undefined) m.status.reputation = 50; 
             const statusMap = { magic: "魔力", stamina: "体力", mood: "心情", health: "健康", reputation: "声望" };
             let statusHtml = '';
@@ -1357,8 +1355,8 @@ c.多人交互对话
         if (m.grades) {
             const age = parseInt(m.age) || 11;
             const isYear5 = age >= 15; 
-            const reqMap = { dada: "黑魔法防御术", charms: "魔咒课", astronomy: "天文学", potions: "魔药课", herbology: "草药学", history: "魔法史", transfiguration: "变形术" };
-            const optMap = { arithmancy: "算数占卜", comc: "神奇动物保护", divination: "占卜学", runes: "古代魔文", muggle: "麻瓜研究" };
+            const reqMap = { dada: "黑防", charms: "魔咒", astronomy: "天文", potions: "魔药", herbology: "草药", history: "魔法史", transfiguration: "变形" };
+            const optMap = { arithmancy: "算数", comc: "神奇动物", divination: "占卜", runes: "古代魔文", muggle: "麻瓜" };
 
             let gradeHtml = '<div style="color:gray; margin-bottom:5px;">必修课</div><div class="grade-grid">';
             for (let key in reqMap) {
@@ -1374,8 +1372,19 @@ c.多人交互对话
                     gradeHtml += `<div class="grade-item"><span>${optMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
                 }
                 gradeHtml += '</div>';
-            } else {
-                gradeHtml += '<div style="color:gray; margin-top:10px; font-size:12px; text-align:center;">选修课将在五年级(15岁)开启</div>';
+            }
+
+            // 往年成绩折叠显示
+            if (gameState.pastGrades && gameState.pastGrades.length > 0) {
+                gradeHtml += `<div style="margin-top:10px; border-top:1px dashed var(--border-color); padding-top:5px;">
+                    <div style="font-size:12px; color:gray; cursor:pointer; user-select:none;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">▶ 往年成绩单 (点击展开)</div>
+                    <div style="display:none; font-size:11px; margin-top:5px; background:rgba(0,0,0,0.05); padding:5px; border-radius:4px;">`;
+                gameState.pastGrades.forEach((pg, idx) => {
+                    gradeHtml += `<div style="font-weight:bold; color:var(--primary-color); margin-top:5px;">第 ${idx+1} 学年:</div><div style="column-count: 2; margin-bottom:5px;">`;
+                    for(let k in pg) { gradeHtml += `<div>${reqMap[k]||optMap[k]||k}: ${getGradeLetter(pg[k])}</div>`; }
+                    gradeHtml += `</div>`;
+                });
+                gradeHtml += `</div></div>`;
             }
             document.getElementById('grades-container').innerHTML = gradeHtml;
         }
@@ -1391,23 +1400,23 @@ c.多人交互对话
             gameState.story.options.forEach((opt, index) => {
                 html += `<button class="btn" onclick="selectOption('${opt}')">[选项${index+1}] ${opt}</button>`;
             });
+            // 暑假跳过按钮逻辑
+            let weekInYear = gameState.turn === 0 ? 0 : ((gameState.turn - 1) % 50 + 1);
+            if (weekInYear > 40 && weekInYear <= 50) {
+                html += `<button class="btn" style="background-color:#009966;" onclick="skipSummer()">⏩ 跳过假期 (开启下一学年)</button>`;
+            }
             optContainer.innerHTML = html;
         } else {
             optContainer.innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">暂无选项</div>`;
         }
 
-        // 解析资产显示金钱
+        // 精确解析底层资产显示金钱
         const moneyEl = document.getElementById('inventory-money');
-        if (gameState.main.assets) {
-            let match = gameState.main.assets.match(/(\d+)\s*金?加隆.*?(\d+)\s*银?西可.*?(\d+)\s*铜?纳特/);
-            if (match) moneyEl.innerText = `${match[1]}金加隆 ${match[2]}银西可 ${match[3]}铜纳特`;
-            else {
-                let simpleMatch = gameState.main.assets.match(/(\d+)\s*金?加隆/);
-                if (simpleMatch) moneyEl.innerText = `${simpleMatch[1]} 金加隆 (详情见巫师档案)`;
-                else moneyEl.innerText = "详情见巫师档案";
-            }
+        if (typeof getMoneyInKnuts === "function") {
+            let knuts = getMoneyInKnuts(gameState.main.assets || "");
+            moneyEl.innerText = knutsToString(knuts);
         } else {
-            moneyEl.innerText = "0 金加隆 0 银西可 0 铜纳特";
+            moneyEl.innerText = "刷新页面后生效";
         }
 
         const invList = document.getElementById('inventoryList');
@@ -2288,13 +2297,63 @@ c.多人交互对话
         switchTab('story', document.querySelectorAll('.nav-item')[1]);
     }
 
+    function checkYearEvents() {
+        if (gameState.turn === 0) return;
+        let weekInYear = (gameState.turn - 1) % 50 + 1;
+        
+        if (weekInYear === 30) {
+            alert("📅 【教务处提示】\n距离期末考试还有 10 周！\n请抓紧时间复习，提升各科成绩与属性！");
+        } else if (weekInYear === 35) {
+            alert("📅 【教务处提示】\n距离期末考试仅剩 5 周！");
+        } else if (weekInYear === 40) {
+            // 第40周：强制成绩结算
+            let g = gameState.main.grades;
+            let repChange = 0;
+            let famChange = 0;
+            let report = "【学年期末成绩单汇总】\n";
+            for(let key in g) {
+                let score = g[key];
+                if (score < 60) { repChange -= 2; famChange -= 2; report += `❌ ${key}: 不合格(扣分)\n`; }
+                else if (score >= 90) { repChange += 5; famChange += 5; report += `🌟 ${key}: 优秀[O](大加分)\n`; }
+                else if (score >= 80) { repChange += 2; famChange += 2; report += `⭐ ${key}: 良好[E](加分)\n`; }
+            }
+            
+            gameState.main.status.reputation = Math.min(100, Math.max(0, (gameState.main.status.reputation||50) + repChange));
+            gameState.npcs.forEach(n => {
+                if(n.desc && (n.desc.includes("家人") || n.desc.includes("父母") || n.desc.includes("亲戚"))) {
+                    n.relation = Math.min(100, Math.max(-100, n.relation + famChange));
+                }
+            });
+            report += `\n声望变动: ${repChange > 0 ? '+'+repChange : repChange}\n家属好感变动: ${famChange > 0 ? '+'+famChange : famChange}\n\n下周开始将进入为期10周的假期，你必须离开学校！`;
+            
+            if(!gameState.pastGrades) gameState.pastGrades = [];
+            gameState.pastGrades.push(JSON.parse(JSON.stringify(g)));
+            for(let key in g) g[key] = 0; // 清空本学年成绩
+            
+            updateTraits();
+            alert(report);
+            updateUI();
+        }
+    }
+
+    function skipSummer() {
+        if (!checkActionAllowed()) return;
+        saveCurrentToHistory();
+        let currentYear = Math.floor((gameState.turn - 1) / 50) + 1;
+        gameState.turn = currentYear * 50; 
+        gameState.history.length = gameState.turn; 
+        gameState.maxTurn = gameState.turn;
+        gameState.turnDrafts = []; 
+        callAPI(`我决定跳过无聊的假期。请直接让我进入第 ${currentYear + 1} 学年，乘坐霍格沃茨特快回到学校，并生成新学年第一周在校内的剧情。`);
+    }
+
     function selectOption(optText) {
         if (!checkActionAllowed()) return;
         saveCurrentToHistory();
         gameState.history.length = gameState.turn; 
         gameState.maxTurn = gameState.turn;
-        gameState.turnDrafts = []; // 进入下一周，清空本周草稿
-        callAPI(`我选择了选项：【${optText}】。请推进下一周，生成不少于3000字的剧情，并更新我的主控面板、背包和社交状态。`);
+        gameState.turnDrafts = [];
+        callAPI(`我选择了选项：【${optText}】。请推进下一周，生成不少于3000字的剧情，并更新状态。`);
     }
 
     function submitCustomAction() {
@@ -2306,20 +2365,116 @@ c.多人交互对话
         saveCurrentToHistory();
         gameState.history.length = gameState.turn; 
         gameState.maxTurn = gameState.turn;
-        gameState.turnDrafts = []; // 进入下一周，清空本周草稿
-        callAPI(`我自主决定采取行动：【${action}】。请根据我的行动推进下一周，生成不少于3000字的剧情，并更新状态。`);
+        gameState.turnDrafts = [];
+        callAPI(`我自主决定采取行动：【${action}】。请根据行动推进下一周，生成剧情并更新状态。`);
     }
 
-    function submitCustomAction() {
-        if (!checkActionAllowed()) return;
-        const input = document.getElementById('customActionInput');
-        const action = input.value.trim();
-        if(!action) { alert("请输入行动内容！"); return; }
-        input.value = '';
-        saveCurrentToHistory();
-        gameState.history.length = gameState.turn; 
-        gameState.maxTurn = gameState.turn;
-        callAPI(`我自主决定采取行动：【${action}】。请根据我的行动推进下一周，生成不少于3000字的剧情，并更新状态。`);
+    // --- API 调用 (后台生成，不阻塞) ---
+    async function callAPI(userPrompt, isRegenerate = false) {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+
+        if(!url || !key || !model) {
+            alert("请先在【设置】中配置API端口、密钥并拉取选择模型！");
+            switchTab('settings', document.querySelectorAll('.nav-item')[5]);
+            return;
+        }
+
+        gameState.lastPrompt = userPrompt;
+
+        document.getElementById('storyText').innerText = "大魔法师正在后台编织命运，请稍候...\n(您可以切换到其他页面查看信息，生成完毕后会自动更新)";
+        document.getElementById('storyOptions').innerHTML = `<div style="color:gray; text-align:center; font-size:12px;">生成中...</div>`;
+
+        let currentTurnForPrompt = isRegenerate ? gameState.turn : (gameState.turn + 1);
+        let yearNum = Math.floor((currentTurnForPrompt - 1) / 50) + 1;
+        let weekInYear = (currentTurnForPrompt - 1) % 50 + 1;
+        let timeConstraint = `当前为第 ${yearNum} 学年的第 ${weekInYear} 周。注意：每学年的前40周必须在校内推进主线，第41-50周为假期，剧情必须发生在校外！`;
+
+        let systemPrompt = `你是一个完全符合《哈利波特》原著设定的文字养成游戏引擎。
+请严格遵守以下核心设定：
+${coreReferenceText}
+
+玩家当前人设：
+${gameState.characterLore || "无"}
+
+【时间线约束】：${timeConstraint}
+
+当前游戏状态（JSON）：
+${JSON.stringify(gameState.main)}
+
+【重要状态规则】
+1. 成绩(grades)和属性平时不要随意增加，必须与本周剧情严格挂钩。
+2. 状态(status)包括 magic, stamina, mood, health。若低于20会带来极大概率的失败和伤病。
+3. 你的剧情必须体现状态影响，并且在文末写出数值变动，例如：“上了一节魔药课 魔药学+10，体力-10”。
+4. 【极其重要】主控面板(main)各项描述(如 era, location, weather等)每项严格控制在150字以内！
+
+【输出格式】必须是合法的JSON：
+{
+  "main": { ...原样保留所有键值... },
+  "story": { "text": "本周的细腻剧情，严格≥3000字，末尾注名属性增减。", "options": ["选项1", "选项2", "选项3", "选项4", "选项5"] },
+  "inventory": [ ... ],
+  "npcs": [ ... ]
+}`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], temperature: 0.7 })
+            });
+
+            if (!response.ok) {
+                let errText = `HTTP error! status: ${response.status}`;
+                try {
+                    const errData = await response.json();
+                    if (errData.error && errData.error.code) errText += ` ${errData.error.code}`;
+                    if (errData.error && errData.error.message) errText += ` ${errData.error.message}`;
+                } catch(e) {}
+                throw new Error(errText);
+            }
+            
+            const data = await response.json();
+            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            
+            if(data.usage && data.usage.total_tokens) gameState.stats.totalTokens += data.usage.total_tokens;
+            gameState.stats.totalChars += replyText.length;
+
+            try {
+                const parsedData = JSON.parse(replyText);
+                if(parsedData.main) {
+                    gameState.main = parsedData.main;
+                    if(!gameState.main.status) gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+                    updateTraits();
+                }
+                if(parsedData.story) gameState.story = parsedData.story;
+                if(parsedData.inventory) gameState.inventory = parsedData.inventory;
+                if(parsedData.npcs) gameState.npcs = parsedData.npcs;
+                
+                if (!isRegenerate) {
+                    gameState.turn++;
+                    gameState.maxTurn = gameState.turn;
+                    checkYearEvents(); // 检测成绩单和考试周
+                }
+                saveCurrentToHistory(); 
+                updateUI();
+                addLog("API调用(推周)", true, `成功生成第 ${gameState.turn} 周`);
+                
+                if(!document.getElementById('view-story').classList.contains('active')) {
+                    alert("✨ 新一周的命运已编织完毕，请前往【剧情】页面查看！");
+                }
+            } catch (parseErr) {
+                gameState.story.text = "【系统警告：大模型未返回标准JSON格式，以下为原始文本】\n\n" + replyText;
+                gameState.story.options = [];
+                updateUI();
+                addLog("API调用(推周)", false, "JSON解析失败");
+            }
+
+        } catch (error) {
+            gameState.story.text = "生成失败：" + error.message;
+            updateUI();
+            addLog("API调用(推周)", false, error.message);
+        }
     }
 
     // --- API 调用 (后台生成，不阻塞) ---
@@ -3080,7 +3235,7 @@ ${JSON.stringify(gameState.main)}
         }
     }
 
-    function enterHouseDirectly(house) {
+        function enterHouseDirectly(house) {
         closeModal();
         addTime(5);
         gameState.mapData.currentLoc = house + "休息室";
@@ -3090,8 +3245,12 @@ ${JSON.stringify(gameState.main)}
         document.getElementById('map-location-view').style.display = 'block';
         document.getElementById('loc-title').innerText = `📍 ${house} 休息室`;
         
+        // 防崩溃容错：万一旧存档没有初始化积分
+        if (!gameState.mapData.housePoints) {
+            gameState.mapData.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+        }
         let pts = gameState.mapData.housePoints;
-        let dailyPwd = gameState.mapData.passwords[house];
+        let dailyPwd = gameState.mapData.passwords[house] || "未知口令";
 
         document.getElementById('loc-actions').innerHTML = `
             <button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('消磨时间')">🛋️ 在沙发上休息 (1小时)</button>
@@ -3114,6 +3273,188 @@ ${JSON.stringify(gameState.main)}
         `;
         renderLocNpcs();
     }
+
+    async function enterOffices() {
+        if (!checkHogwartsAdmitted()) return;
+        patchMapData();
+        addTime(5);
+        if(!gameState.mapData.professors) {
+            const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const key = document.getElementById('apiKey').value;
+            const model = document.getElementById('apiModel').value;
+            if(!url || !key || !model) {
+                gameState.mapData.professors = ["米勒娃·麦格", "西弗勒斯·斯内普", "菲利乌斯·弗立维", "波莫娜·斯普劳特", "西比尔·特里劳妮", "罗兰达·霍琦"];
+            } else {
+                document.getElementById('loc-title').innerText = "获取教授名单中...";
+                try {
+                    let res = await fetch(`${url}/v1/chat/completions`, {
+                        method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: model, messages: [{ role: "user", content: `请返回6名《哈利波特》原著中霍格沃茨在校教授的名字。只需严格返回JSON数组格式如 ["麦格", "斯内普"]，无需其他废话。` }], temperature: 0.5 })
+                    });
+                    let data = await res.json();
+                    let txt = data.choices[0].message.content.replace(/```json|```/g,'').trim();
+                    gameState.mapData.professors = JSON.parse(txt);
+                } catch(e) {
+                    gameState.mapData.professors = ["麦格", "斯内普", "弗立维", "斯普劳特", "特里劳妮", "霍琦"];
+                }
+            }
+        }
+        
+        gameState.mapData.currentLoc = "教授办公室";
+        document.getElementById('map-main-view').style.display = 'none';
+        document.getElementById('map-location-view').style.display = 'block';
+        document.getElementById('loc-title').innerText = `📍 教授办公区`;
+        document.getElementById('loc-actions').innerHTML = '';
+        
+        let npcHtml = '';
+        gameState.mapData.professors.forEach(prof => {
+            let inOffice = Math.random() < 0.8;
+            npcHtml += `<div style="border:1px solid var(--border-color); padding:5px 8px; margin-bottom:5px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:13px;">${prof} 教授</div>
+                    <div style="font-size:11px; color:gray;">${inOffice ? '正在批改作业' : '门锁着'}</div>
+                </div>
+                <button class="btn btn-outline" style="width:auto; padding:2px 8px; margin:0; font-size:12px;" ${inOffice ? `onclick="meetProfessor('${prof}')"` : 'disabled'}>敲门</button>
+            </div>`;
+        });
+        document.getElementById('loc-npcs').innerHTML = npcHtml;
+    }
+
+    // --- 教授专属独立模态框交互 ---
+    function meetProfessor(profName) {
+        addTime(5);
+        let n = gameState.npcs.find(x => x.name.includes(profName));
+        if (!n) {
+            n = { id: Date.now(), name: profName, category: "校内", desc: "霍格沃茨教授", house: "教职工", relation: 30, chatHistory: [] };
+            gameState.npcs.push(n);
+            updateUI(); 
+        }
+        if(!n.chatHistory) n.chatHistory = [];
+        
+        let chatHtml = `<div id="prof-chat-box" style="height:150px; overflow-y:auto; font-size:12px; margin-bottom:10px; background:var(--bg-color); padding:8px; border-radius:4px; border:1px inset var(--border-color);">`;
+        if (n.chatHistory.length === 0) chatHtml += `<div style="color:gray; text-align:center;">暂无聊天记录，向教授打个招呼吧。</div>`;
+        n.chatHistory.forEach(msg => {
+            let align = msg.role === 'user' ? 'right' : 'left';
+            let color = msg.role === 'user' ? 'var(--primary-color)' : 'black';
+            chatHtml += `<div style="margin-bottom:6px; text-align:${align}; color:${color};">${msg.text}</div>`;
+        });
+        chatHtml += `</div>`;
+
+        // 三年级特殊任务：麦格教授提交同意书
+        let mcgonagallQuest = "";
+        if (profName.includes("麦格") && parseInt(gameState.main.age) >= 13 && !gameState.mapData.hogsmeadeUnlocked) {
+            mcgonagallQuest = `<button class="btn" style="width:100%; margin-bottom:8px; padding:6px; background-color:#CC9900; color:black; border:none;" onclick="submitPermissionForm()">📝 提交霍格莫德同意书</button>`;
+        }
+
+        let html = `
+            <div style="font-size:12px; color:gray; margin-bottom:8px; text-align:center;">你推门进入了 ${profName} 的办公室，教授抬头看了你一眼。</div>
+            ${mcgonagallQuest}
+            
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <span style="font-weight:bold; font-size:13px; color:var(--primary-color);">💬 互动与闲聊</span>
+                    <button class="btn btn-outline" style="width:auto; margin:0; padding:2px 8px; font-size:11px;" onclick="profTeach('${profName}')">📖 学术请教 (+属性)</button>
+                </div>
+                ${chatHtml}
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <input type="text" id="prof-chat-input" placeholder="和教授说点什么..." style="flex:1; margin:0; padding:4px 6px; border-radius:4px; font-size:12px;">
+                    <button class="btn" style="width:auto; margin:0; padding:4px 12px; font-size:12px;" onclick="profChat('${profName}')">发送</button>
+                </div>
+            </div>
+        `;
+        openModal(`🚪 ${profName} 的办公室`, html);
+        setTimeout(() => { let box = document.getElementById('prof-chat-box'); if(box) box.scrollTop = box.scrollHeight; }, 100);
+    }
+
+    function submitPermissionForm() {
+        let formIdx = gameState.inventory.findIndex(i => i.name.includes("同意书") || i.name.includes("签名"));
+        if (formIdx !== -1) {
+            gameState.inventory.splice(formIdx, 1);
+            gameState.mapData.hogsmeadeUnlocked = true;
+            alert("麦格教授推了推眼镜，仔细检查了签名。\n“很好，你可以去霍格莫德了。”\n【已永久解锁霍格莫德】");
+            closeModal();
+            updateMapTimeUI(); // 刷新地图密道显示
+        } else {
+            alert("麦格教授严厉地看着你：“你的监护人同意书呢？没有签名我绝不会放你去的。请在【剧情】中想办法拿到签名。”");
+        }
+    }
+
+    async function profChat(profName) {
+        let input = document.getElementById('prof-chat-input').value.trim();
+        if(!input) return;
+        
+        let n = gameState.npcs.find(x => x.name.includes(profName));
+        let box = document.getElementById('prof-chat-box');
+        
+        if (box.innerText.includes("暂无聊天记录")) box.innerHTML = "";
+        box.innerHTML += `<div style="color:var(--primary-color); margin-bottom:6px; text-align:right;">你: ${input}</div>`;
+        document.getElementById('prof-chat-input').value = "";
+        
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url || !key || !model) {
+            let defReply = "教授若有所思地点了点头。(未配置API)";
+            box.innerHTML += `<div style="color:black; margin-bottom:6px;">教授: ${defReply}</div>`;
+            n.chatHistory.push({role:'user', text: input}, {role:'npc', text: defReply});
+            box.scrollTop = box.scrollHeight;
+            return;
+        }
+        
+        box.innerHTML += `<div id="prof-typing" style="color:gray; margin-bottom:6px; font-style:italic;">教授正在思考如何回复你...</div>`;
+        box.scrollTop = box.scrollHeight;
+        
+        let chatContext = n.chatHistory.map(m => (m.role==='user'?"我":"教授")+":"+m.text).join('\n');
+        let sysPrompt = `你扮演霍格沃茨的【${profName}】教授。绝对不要崩人设。
+玩家档案设定：${gameState.characterLore || "普通的11岁学生"}。
+历史对话记录：${chatContext}
+对玩家的好感度为：${n.relation} (0-100)。
+请根据好感度和你的原著性格，简短精炼地直接输出你对玩家说的话（不要带引号和前缀）。`;
+        
+        try {
+            let res = await fetch(`${url}/v1/chat/completions`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, messages: [{ role: "system", content: sysPrompt }, { role: "user", content: input }], temperature: 0.7 })
+            });
+            let data = await res.json();
+            let reply = data.choices[0].message.content.trim();
+            
+            n.chatHistory.push({role:'user', text: input}, {role:'npc', text: reply});
+            document.getElementById('prof-typing').remove();
+            box.innerHTML += `<div style="color:black; margin-bottom:6px;">教授: ${reply}</div>`;
+            box.scrollTop = box.scrollHeight;
+        } catch(e) {
+            document.getElementById('prof-typing').remove();
+            box.innerHTML += `<div style="color:red; margin-bottom:6px;">[魔法磁场干扰，API请求失败]</div>`;
+        }
+    }
+
+    function profTeach(profName) {
+        let n = gameState.npcs.find(x => x.name.includes(profName));
+        let rel = n ? n.relation : 30;
+        
+        let subject = "charms"; 
+        let subName = "魔咒学";
+        if(profName.includes("麦格")) { subject = "transfiguration"; subName = "变形术"; }
+        else if(profName.includes("斯内普")) { subject = "potions"; subName = "魔药学"; }
+        else if(profName.includes("特里劳妮")) { subject = "divination"; subName = "占卜学"; }
+        else if(profName.includes("邓布利多") || profName.includes("卢平") || profName.includes("奇洛")) { subject = "dada"; subName = "黑魔法防御术"; }
+        
+        let base = Math.floor(Math.random() * 3); 
+        let bonus = Math.floor(rel / 25); 
+        let total = Math.min(5, base + bonus);
+        
+        if (!gameState.main.attributes) gameState.main.attributes = {};
+        
+        if(total > 0) {
+            gameState.main.attributes[subject] = Math.min(100, (gameState.main.attributes[subject]||0) + total);
+            updateUI();
+            alert(`🎓 你向 ${profName} 虚心请教了学术问题。教授根据你的提问进行了耐心指导。\n【${subName} 属性 +${total}】`);
+        } else {
+            alert(`🎓 你向 ${profName} 请教了问题，但教授似乎不太想理你，或者觉得你的问题太简单了，只是敷衍了两句。`);
+        }
+    }
+
 
     function renderLocNpcs() {
         let html = '';
