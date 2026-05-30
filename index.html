@@ -2071,7 +2071,17 @@ c.多人交互对话
                 method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: model, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: `请为【${shopName}】进货。` }], temperature: 0.7 })
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            if (!response.ok) {
+                let errText = `HTTP error! status: ${response.status}`;
+                try {
+                    const errData = await response.json();
+                    if (errData.error && errData.error.code) errText += ` ${errData.error.code}`;
+                    if (errData.error && errData.error.message) errText += ` ${errData.error.message}`;
+                } catch(e) {}
+                throw new Error(errText);
+            }
+            
             const data = await response.json();
             let replyText = data.choices[0].message.content.trim();
             if(replyText.startsWith("```json")) replyText = replyText.replace(/^```json/, '');
@@ -2692,14 +2702,41 @@ ${JSON.stringify(gameState.main)}
         renderPresets();
     }
 
-    // --- API 模型拉取 ---
+    // --- API 模型拉取与定制报错 ---
+    function getFriendlyErrorMsg(detail) {
+        let msg = String(detail);
+        if (msg.includes('401')) return "401 - 你用的啥密钥啊，这玩意不能用";
+        if (msg.includes('402')) return "402 - 你没钱了，快点去充钱吧";
+        if (msg.includes('403')) return "403 - 这个不能用，你挂个梯子试试看吧";
+        if (msg.includes('404')) return "404 - 模型不能用也可能是端口错了";
+        if (msg.includes('429')) return "429 - 用慢点好不好，ai大脑过载了";
+        if (msg.includes('502')) return "502 - 上游出问题了，等着吧，这段时间应该都不能用了";
+        if (msg.includes('503')) return "503 - 服务器不太行";
+        if (msg.includes('504')) return "504 - 超时";
+        if (msg.includes('context_length_exceeded')) return "context_length_exceeded - 呃呃呃你咋这么能聊，超过上下文限制了你完了";
+        if (msg.includes('timeout') || msg.includes('超时') || msg.includes('Failed to fetch')) return "请求超时 - 超时";
+        return msg; // 如果没匹配上，返回原始报错
+    }
+
     function addLog(action, success, detail) {
         const logBox = document.getElementById('apiLog');
         const time = new Date().toLocaleTimeString();
         const color = success ? '#0f0' : '#f00';
+        
+        // 如果失败，经过翻译器转化为定制报错
+        let displayDetail = detail;
+        if (!success) {
+            displayDetail = getFriendlyErrorMsg(detail);
+            // 如果是在主控生成剧情时报错，把大弹窗的提示也改成定制版
+            if (action === "API调用" && gameState.story.text.includes("生成失败")) {
+                gameState.story.text = "生成失败：" + displayDetail;
+                document.getElementById('storyText').innerText = gameState.story.text;
+            }
+        }
+
         const entry = document.createElement('div');
         entry.className = 'log-entry';
-        entry.innerHTML = `<span style="color:gray">[${time}]</span> ${action}: <span style="color:${color}">${success ? '成功' : '失败'}</span> - ${detail}`;
+        entry.innerHTML = `<span style="color:gray">[${time}]</span> ${action}: <span style="color:${color}">${success ? '成功' : '失败'}</span> - ${displayDetail}`;
         logBox.prepend(entry);
     }
 
@@ -2768,9 +2805,11 @@ ${JSON.stringify(gameState.main)}
         }
         if (gameState.mapData.hogsmeadeUnlocked === undefined) gameState.mapData.hogsmeadeUnlocked = false;
         if (gameState.mapData.passageUnlocked === undefined) gameState.mapData.passageUnlocked = false;
-        // 初始化四个学院的积分
         if (!gameState.mapData.housePoints) {
             gameState.mapData.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+        }
+        if (!gameState.mapData.vivian) {
+            gameState.mapData.vivian = { items: [], lastRefreshTurn: -99 };
         }
     }
 
@@ -2815,7 +2854,6 @@ ${JSON.stringify(gameState.main)}
             }
         }
         
-        // 动态生成密道按钮
         let mapDiv = document.querySelector('#map-main-view .card:nth-child(1) > div');
         if (mapDiv && gameState.mapData.passageUnlocked) {
             if (!document.getElementById('btn-secret-passage')) {
@@ -2838,11 +2876,9 @@ ${JSON.stringify(gameState.main)}
             gameState.mapData.hours += Math.floor(gameState.mapData.minutes / 60);
             gameState.mapData.minutes %= 60;
         }
-        // 每日午夜刷新
         if (gameState.mapData.hours >= 24) {
             gameState.mapData.hours %= 24;
             gameState.mapData.day++;
-            // 更新口令
             gameState.mapData.passwords = {
                 "格兰芬多": housePasswords["格兰芬多"][Math.floor(Math.random()*10)],
                 "斯莱特林": housePasswords["斯莱特林"][Math.floor(Math.random()*10)],
@@ -2850,7 +2886,6 @@ ${JSON.stringify(gameState.main)}
                 "赫奇帕奇": housePasswords["赫奇帕奇"][Math.floor(Math.random()*10)],
                 "校长": hmPasswords[Math.floor(Math.random()*10)]
             };
-            // 每天学院分随机浮动，让学校生活更真实
             for(let h in gameState.mapData.housePoints) {
                 gameState.mapData.housePoints[h] = Math.max(0, gameState.mapData.housePoints[h] + Math.floor(Math.random()*15) - 5);
             }
@@ -2909,6 +2944,16 @@ ${JSON.stringify(gameState.main)}
 
         gameState.mapData.currentLoc = locName;
         gameState.mapData.locNpcs = generateLocNpcs();
+        
+        // 走廊特殊NPC：神奇的薇薇安 (40%概率出现)
+        if (locName === '走廊' && Math.random() < 0.4) {
+            gameState.mapData.locNpcs.push({
+                id: 'vivian', 
+                name: '神奇的薇薇安',
+                isKnown: true,
+                action: '鬼鬼祟祟地靠在墙角，大衣里似乎藏着许多瓶瓶罐罐'
+            });
+        }
         
         document.getElementById('map-main-view').style.display = 'none';
         document.getElementById('map-location-view').style.display = 'block';
@@ -3070,194 +3115,15 @@ ${JSON.stringify(gameState.main)}
         renderLocNpcs();
     }
 
-    async function enterOffices() {
-        if (!checkHogwartsAdmitted()) return;
-        patchMapData();
-        addTime(5);
-        if(!gameState.mapData.professors) {
-            const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
-            const key = document.getElementById('apiKey').value;
-            const model = document.getElementById('apiModel').value;
-            if(!url || !key || !model) {
-                gameState.mapData.professors = ["米勒娃·麦格", "西弗勒斯·斯内普", "菲利乌斯·弗立维", "波莫娜·斯普劳特", "西比尔·特里劳妮", "罗兰达·霍琦"];
-            } else {
-                document.getElementById('loc-title').innerText = "获取教授名单中...";
-                try {
-                    let res = await fetch(`${url}/v1/chat/completions`, {
-                        method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ model: model, messages: [{ role: "user", content: `请返回6名《哈利波特》原著中霍格沃茨在校教授的名字。只需严格返回JSON数组格式如 ["麦格", "斯内普"]，无需其他废话。` }], temperature: 0.5 })
-                    });
-                    let data = await res.json();
-                    let txt = data.choices[0].message.content.replace(/```json|```/g,'').trim();
-                    gameState.mapData.professors = JSON.parse(txt);
-                } catch(e) {
-                    gameState.mapData.professors = ["麦格", "斯内普", "弗立维", "斯普劳特", "特里劳妮", "霍琦"];
-                }
-            }
-        }
-        
-        gameState.mapData.currentLoc = "教授办公室";
-        document.getElementById('map-main-view').style.display = 'none';
-        document.getElementById('map-location-view').style.display = 'block';
-        document.getElementById('loc-title').innerText = `📍 教授办公区`;
-        document.getElementById('loc-actions').innerHTML = '';
-        
-        let npcHtml = '';
-        gameState.mapData.professors.forEach(prof => {
-            let inOffice = Math.random() < 0.8;
-            npcHtml += `<div style="border:1px solid var(--border-color); padding:5px 8px; margin-bottom:5px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <div style="font-weight:bold; font-size:13px;">${prof} 教授</div>
-                    <div style="font-size:11px; color:gray;">${inOffice ? '正在批改作业' : '门锁着'}</div>
-                </div>
-                <button class="btn btn-outline" style="width:auto; padding:2px 8px; margin:0; font-size:12px;" ${inOffice ? `onclick="meetProfessor('${prof}')"` : 'disabled'}>敲门</button>
-            </div>`;
-        });
-        document.getElementById('loc-npcs').innerHTML = npcHtml;
-    }
-
-    // --- 教授专属独立模态框交互 ---
-    function meetProfessor(profName) {
-        addTime(5);
-        let n = gameState.npcs.find(x => x.name.includes(profName));
-        if (!n) {
-            n = { id: Date.now(), name: profName, category: "校内", desc: "霍格沃茨教授", house: "教职工", relation: 30, chatHistory: [] };
-            gameState.npcs.push(n);
-            updateUI(); 
-        }
-        if(!n.chatHistory) n.chatHistory = [];
-        
-        let chatHtml = `<div id="prof-chat-box" style="height:150px; overflow-y:auto; font-size:12px; margin-bottom:10px; background:var(--bg-color); padding:8px; border-radius:4px; border:1px inset var(--border-color);">`;
-        if (n.chatHistory.length === 0) chatHtml += `<div style="color:gray; text-align:center;">暂无聊天记录，向教授打个招呼吧。</div>`;
-        n.chatHistory.forEach(msg => {
-            let align = msg.role === 'user' ? 'right' : 'left';
-            let color = msg.role === 'user' ? 'var(--primary-color)' : 'black';
-            chatHtml += `<div style="margin-bottom:6px; text-align:${align}; color:${color};">${msg.text}</div>`;
-        });
-        chatHtml += `</div>`;
-
-        // 三年级特殊任务：麦格教授提交同意书
-        let mcgonagallQuest = "";
-        if (profName.includes("麦格") && parseInt(gameState.main.age) >= 13 && !gameState.mapData.hogsmeadeUnlocked) {
-            mcgonagallQuest = `<button class="btn" style="width:100%; margin-bottom:8px; padding:6px; background-color:#CC9900; color:black; border:none;" onclick="submitPermissionForm()">📝 提交霍格莫德同意书</button>`;
-        }
-
-        let html = `
-            <div style="font-size:12px; color:gray; margin-bottom:8px; text-align:center;">你推门进入了 ${profName} 的办公室，教授抬头看了你一眼。</div>
-            ${mcgonagallQuest}
-            
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                    <span style="font-weight:bold; font-size:13px; color:var(--primary-color);">💬 互动与闲聊</span>
-                    <button class="btn btn-outline" style="width:auto; margin:0; padding:2px 8px; font-size:11px;" onclick="profTeach('${profName}')">📖 学术请教 (+属性)</button>
-                </div>
-                ${chatHtml}
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <input type="text" id="prof-chat-input" placeholder="和教授说点什么..." style="flex:1; margin:0; padding:4px 6px; border-radius:4px; font-size:12px;">
-                    <button class="btn" style="width:auto; margin:0; padding:4px 12px; font-size:12px;" onclick="profChat('${profName}')">发送</button>
-                </div>
-            </div>
-        `;
-        openModal(`🚪 ${profName} 的办公室`, html);
-        setTimeout(() => { let box = document.getElementById('prof-chat-box'); if(box) box.scrollTop = box.scrollHeight; }, 100);
-    }
-
-    function submitPermissionForm() {
-        let formIdx = gameState.inventory.findIndex(i => i.name.includes("同意书") || i.name.includes("签名"));
-        if (formIdx !== -1) {
-            gameState.inventory.splice(formIdx, 1);
-            gameState.mapData.hogsmeadeUnlocked = true;
-            alert("麦格教授推了推眼镜，仔细检查了签名。\n“很好，你可以去霍格莫德了。”\n【已永久解锁霍格莫德】");
-            closeModal();
-            updateUI();
-        } else {
-            alert("麦格教授严厉地看着你：“你的监护人同意书呢？没有签名我绝不会放你去的。请在【剧情】中想办法拿到签名。”");
-        }
-    }
-
-    async function profChat(profName) {
-        let input = document.getElementById('prof-chat-input').value.trim();
-        if(!input) return;
-        
-        let n = gameState.npcs.find(x => x.name.includes(profName));
-        let box = document.getElementById('prof-chat-box');
-        
-        if (box.innerText.includes("暂无聊天记录")) box.innerHTML = "";
-        box.innerHTML += `<div style="color:var(--primary-color); margin-bottom:6px; text-align:right;">你: ${input}</div>`;
-        document.getElementById('prof-chat-input').value = "";
-        
-        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
-        const key = document.getElementById('apiKey').value;
-        const model = document.getElementById('apiModel').value;
-        if(!url || !key || !model) {
-            let defReply = "教授若有所思地点了点头。(未配置API)";
-            box.innerHTML += `<div style="color:black; margin-bottom:6px;">教授: ${defReply}</div>`;
-            n.chatHistory.push({role:'user', text: input}, {role:'npc', text: defReply});
-            box.scrollTop = box.scrollHeight;
-            return;
-        }
-        
-        box.innerHTML += `<div id="prof-typing" style="color:gray; margin-bottom:6px; font-style:italic;">教授正在思考如何回复你...</div>`;
-        box.scrollTop = box.scrollHeight;
-        
-        let chatContext = n.chatHistory.map(m => (m.role==='user'?"我":"教授")+":"+m.text).join('\n');
-        let sysPrompt = `你扮演霍格沃茨的【${profName}】教授。绝对不要崩人设。
-玩家档案设定：${gameState.characterLore || "普通的11岁学生"}。
-当前周剧情背景(参考)：${gameState.story.text ? gameState.story.text.substring(0,100) : "新学期初"}...
-历史对话记录：${chatContext}
-对玩家的好感度为：${n.relation} (0-100)。
-请根据好感度和你的原著性格，简短精炼地直接输出你对玩家说的话（不要带引号和前缀）。`;
-        
-        try {
-            let res = await fetch(`${url}/v1/chat/completions`, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: model, messages: [{ role: "system", content: sysPrompt }, { role: "user", content: input }], temperature: 0.7 })
-            });
-            let data = await res.json();
-            let reply = data.choices[0].message.content.trim();
-            
-            n.chatHistory.push({role:'user', text: input}, {role:'npc', text: reply});
-            document.getElementById('prof-typing').remove();
-            box.innerHTML += `<div style="color:black; margin-bottom:6px;">教授: ${reply}</div>`;
-            box.scrollTop = box.scrollHeight;
-        } catch(e) {
-            document.getElementById('prof-typing').remove();
-            box.innerHTML += `<div style="color:red; margin-bottom:6px;">[魔法磁场干扰，API请求失败]</div>`;
-        }
-    }
-
-    function profTeach(profName) {
-        let n = gameState.npcs.find(x => x.name.includes(profName));
-        let rel = n ? n.relation : 30;
-        
-        let subject = "charms"; 
-        let subName = "魔咒学";
-        if(profName.includes("麦格")) { subject = "transfiguration"; subName = "变形术"; }
-        else if(profName.includes("斯内普")) { subject = "potions"; subName = "魔药学"; }
-        else if(profName.includes("特里劳妮")) { subject = "divination"; subName = "占卜学"; }
-        else if(profName.includes("邓布利多") || profName.includes("卢平") || profName.includes("奇洛")) { subject = "dada"; subName = "黑魔法防御术"; }
-        
-        let base = Math.floor(Math.random() * 3); 
-        let bonus = Math.floor(rel / 25); 
-        let total = Math.min(5, base + bonus);
-        
-        if (!gameState.main.attributes) gameState.main.attributes = {};
-        
-        if(total > 0) {
-            gameState.main.attributes[subject] = Math.min(100, (gameState.main.attributes[subject]||0) + total);
-            updateUI();
-            alert(`🎓 你向 ${profName} 虚心请教了学术问题。教授根据你的提问进行了耐心指导。\n【${subName} 属性 +${total}】`);
-        } else {
-            alert(`🎓 你向 ${profName} 请教了问题，但教授似乎不太想理你，或者觉得你的问题太简单了，只是敷衍了两句。`);
-        }
-    }
-
     function renderLocNpcs() {
         let html = '';
         gameState.mapData.locNpcs.forEach(n => {
+            let icon = n.isKnown ? '👤' : '❓';
+            if (n.id === 'vivian') icon = '🧙‍♀️'; // 薇薇安专属图标
+            
             html += `<div style="border:1px solid var(--border-color); padding:8px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <div style="font-weight:bold;">${n.isKnown ? '👤 ' : '❓ '}${n.name}</div>
+                    <div style="font-weight:bold;">${icon} ${n.name}</div>
                     <div style="font-size:11px; color:gray;">${n.action}</div>
                 </div>
                 <button class="btn btn-outline" style="width:auto; padding:4px 8px; margin:0;" onclick="interactNpc('${n.id}')">交互</button>
@@ -3267,6 +3133,12 @@ ${JSON.stringify(gameState.main)}
     }
 
     function interactNpc(npcId) {
+        // 薇薇安特殊拦截
+        if (npcId === 'vivian') {
+            openVivianShop();
+            return;
+        }
+        
         let n = gameState.mapData.locNpcs.find(x => x.id.toString() === npcId.toString());
         if (!n) return;
         
@@ -3290,7 +3162,6 @@ ${JSON.stringify(gameState.main)}
             return;
         } 
         
-        // 偷听解锁密道逻辑
         if (Math.random() < 0.1 && !gameState.mapData.passageUnlocked) {
             gameState.mapData.passageUnlocked = true;
             alert("🤫 你成功听到了一个惊天秘密：\n“三楼的独眼女巫雕像后面有一条直通霍格莫德地窖的密道！”\n【已解锁：独眼女巫密道】");
@@ -3332,6 +3203,122 @@ ${JSON.stringify(gameState.main)}
         gameState.npcs.push({ id: n.id, name: n.name, house: "未知学院", relation: 10, desc: "在地图探索时结识的同学。", category: "校内" });
         alert(`🤝 你与 ${n.name} 握了握手，互通了姓名。\n【已添加至巫师通讯录】`);
         updateUI(); renderLocNpcs();
+    }
+
+    function interactLoc(actionType) {
+        addTime(5);
+        if (actionType === '吃东西') {
+            if (Math.random() < 0.6) {
+                const foodPool = ["南瓜馅饼", "岩皮饼", "糖浆布丁", "康沃尔烤包", "牛肾肉布丁", "猪肉香肠", "黄油曲奇", "烤土豆", "蓝莓果酱", "坩埚蛋糕"];
+                let food = foodPool[Math.floor(Math.random() * foodPool.length)];
+                gameState.inventory.push({ id: Date.now(), name: food, desc: "厨房家养小精灵送的食物", effect: "体力+15", amount: 1 });
+                alert(`家养小精灵非常热情！\n塞给了你一份【${food}】！放入背包。`);
+                updateUI();
+            } else {
+                alert("厨房现在太忙了，小精灵们没空理你。");
+            }
+        } else if (actionType === '用餐') {
+            gameState.main.status.stamina = Math.min(100, (gameState.main.status.stamina || 0) + 30);
+            gameState.main.status.mood = Math.min(100, (gameState.main.status.mood || 0) + 10);
+            alert("在餐厅饱餐一顿！\n体力 +30，心情 +10"); updateUI();
+        } else if (actionType === '消磨时间') {
+            addTime(55);
+            alert("你在柔软的沙发上睡着了，时间过去了 1 小时。");
+        }
+    }
+
+    // --- 薇薇安特殊黑市商店 ---
+    function initVivianItems() {
+        return [
+            { name: "迷情剂", cost: "30 金加隆", desc: "散发着珍珠母光泽，极其危险的爱情魔药。", effect: "极大幅度增加好感", stock: 1 },
+            { name: "生死水", cost: "25 金加隆", desc: "强效安眠药，喝下后如同死一般沉睡。", effect: "体力+50, 健康-10", stock: 1 },
+            { name: "吐真剂", cost: "50 金加隆", desc: "无色无味，三滴即可让人吐露最深藏的秘密。", effect: "审问特殊道具", stock: 1 },
+            { name: "福灵剂", cost: "100 金加隆", desc: "液态的好运，稀有至极。", effect: "全属性+50，心情直接满", stock: 1 },
+            { name: "复方汤剂", cost: "40 金加隆", desc: "可以变成另外一个人的样子，持续一小时。", effect: "伪装道具", stock: 2 },
+            { name: "欢欣剂", cost: "10 金加隆", desc: "让人感到极度开心，甚至有点飘飘然。", effect: "心情+50", stock: 3 },
+            { name: "巴费醒脑剂", cost: "20 金加隆", desc: "号称能大幅度提升智力，应付考试专用。", effect: "学业临时提升", stock: 2 },
+            { name: "打嗝药水", cost: "10 银西可", desc: "恶作剧药水，让人不停打嗝。", effect: "整蛊道具", stock: 5 },
+            { name: "缩身药水", cost: "15 金加隆", desc: "使人或动物变小，逃跑或隐藏极佳。", effect: "潜行成功率提升", stock: 2 },
+            { name: "白日梦魔药", cost: "5 金加隆", desc: "喝下后可以做三十分钟极度真实的白日梦。", effect: "心情+30", stock: 3 }
+        ];
+    }
+
+    function openVivianShop() {
+        let vData = gameState.mapData.vivian;
+        if (!vData.items || vData.items.length === 0) {
+            vData.items = initVivianItems();
+        }
+
+        let currentMoneyStr = knutsToString(getMoneyInKnuts(gameState.main.assets));
+        let html = `
+            <div style="font-size:12px; color:gray; margin-bottom:10px;">白金色的头发，海蓝色的眼睛。少女神秘地向你拉开大衣：<br>"嘘，需要点特别的东西吗？只收金加隆，谢绝还价。"</div>
+            <div style="color:#CC9900; font-weight:bold; font-size:13px; margin-bottom:10px; border-bottom:1px dashed var(--border-color); padding-bottom:5px;">当前余额: ${currentMoneyStr}</div>
+        `;
+        
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; max-height:50vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
+        
+        vData.items.forEach(item => {
+            let isSoldOut = item.stock <= 0;
+            let btnText = isSoldOut ? "已被扫空" : `交易 (${item.cost})`;
+            let btnStyle = isSoldOut ? "background-color: gray; color: white; border: none; cursor: not-allowed;" : "";
+            
+            html += `
+                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; opacity: ${isSoldOut ? '0.6' : '1'};">
+                    <div>
+                        <div style="font-weight:bold; font-size:13px; color: purple; display:flex; justify-content:space-between;">
+                            <span>${item.name}</span>
+                            <span style="font-size:11px; color:gray; font-weight:normal;">剩 ${item.stock}</span>
+                        </div>
+                        <div style="font-size:11px; color:gray; margin: 4px 0;">${item.desc}</div>
+                        <div style="font-size:11px; margin-bottom: 8px;">效果: ${item.effect}</div>
+                    </div>
+                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px; border-color:purple; color:purple; ${btnStyle}" 
+                            ${isSoldOut ? 'disabled' : `onclick="buyVivianItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')"`}>
+                        ${btnText}
+                    </button>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        let refreshBtn = '';
+        if (gameState.turn - vData.lastRefreshTurn >= 10) {
+            refreshBtn = `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0; color:purple; border-color:purple;" onclick="refreshVivianShop()">换一批黑货</button>`;
+        } else {
+            let wait = 10 - (gameState.turn - vData.lastRefreshTurn);
+            refreshBtn = `<span style="font-size:12px; color:gray; margin-right:10px;">(等 ${wait} 周上新货)</span>`;
+        }
+
+        openModal(`🧙‍♀️ 神奇的薇薇安`, html, `${refreshBtn}<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="closeModal()">不买了</button>`);
+    }
+
+    function buyVivianItem(itemName, costStr, desc, effect) {
+        if (gameState.turn === 0) { alert("请先开启人生！"); return; }
+        
+        let itemObj = gameState.mapData.vivian.items.find(i => i.name === itemName);
+        if (!itemObj || itemObj.stock <= 0) return;
+
+        if (!deductMoney(costStr)) {
+            alert(`薇薇安冷笑一声：“穷光蛋可买不起这个。”\n(金钱不足：需要 ${costStr})`);
+            return;
+        }
+
+        itemObj.stock--;
+        let existingItem = gameState.inventory.find(i => i.name === itemName);
+        if (existingItem) existingItem.amount++;
+        else gameState.inventory.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: itemName, desc: desc, effect: effect, amount: 1 });
+        
+        updateUI();
+        openVivianShop();
+        alert(`交易成功！\n薇薇安迅速把 ${itemName} 塞进你的口袋。\n消耗了 ${costStr}。`);
+    }
+
+    function refreshVivianShop() {
+        gameState.mapData.vivian.items = initVivianItems();
+        gameState.mapData.vivian.items.forEach(i => { if (Math.random() < 0.3) i.stock = 0; });
+        gameState.mapData.vivian.lastRefreshTurn = gameState.turn;
+        openVivianShop();
+        alert("薇薇安从大衣深处掏出了一批新玩意儿！");
     }
 
     function interactLoc(actionType) {
