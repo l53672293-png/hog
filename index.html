@@ -2768,6 +2768,10 @@ ${JSON.stringify(gameState.main)}
         }
         if (gameState.mapData.hogsmeadeUnlocked === undefined) gameState.mapData.hogsmeadeUnlocked = false;
         if (gameState.mapData.passageUnlocked === undefined) gameState.mapData.passageUnlocked = false;
+        // 初始化四个学院的积分
+        if (!gameState.mapData.housePoints) {
+            gameState.mapData.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+        }
     }
 
     const lastNames = ["史密斯","琼斯","泰勒","威廉姆斯","布朗","戴维斯","埃文斯","威尔逊","托马斯","罗伯茨","约翰逊","刘易斯","沃克","罗宾逊","伍德","怀特","沃森","杰克逊","赖特","格林","哈里斯","库珀","金","李","马丁","克拉克","摩尔","哈里森","墨菲","贝克","丘吉尔","艾伦","福特","戴伊","马歇尔","戈登","奥斯本","帕克","查普曼","埃利斯"];
@@ -2834,9 +2838,11 @@ ${JSON.stringify(gameState.main)}
             gameState.mapData.hours += Math.floor(gameState.mapData.minutes / 60);
             gameState.mapData.minutes %= 60;
         }
+        // 每日午夜刷新
         if (gameState.mapData.hours >= 24) {
             gameState.mapData.hours %= 24;
             gameState.mapData.day++;
+            // 更新口令
             gameState.mapData.passwords = {
                 "格兰芬多": housePasswords["格兰芬多"][Math.floor(Math.random()*10)],
                 "斯莱特林": housePasswords["斯莱特林"][Math.floor(Math.random()*10)],
@@ -2844,6 +2850,10 @@ ${JSON.stringify(gameState.main)}
                 "赫奇帕奇": housePasswords["赫奇帕奇"][Math.floor(Math.random()*10)],
                 "校长": hmPasswords[Math.floor(Math.random()*10)]
             };
+            // 每天学院分随机浮动，让学校生活更真实
+            for(let h in gameState.mapData.housePoints) {
+                gameState.mapData.housePoints[h] = Math.max(0, gameState.mapData.housePoints[h] + Math.floor(Math.random()*15) - 5);
+            }
         }
         updateMapTimeUI();
     }
@@ -3035,10 +3045,27 @@ ${JSON.stringify(gameState.main)}
         document.getElementById('map-location-view').style.display = 'block';
         document.getElementById('loc-title').innerText = `📍 ${house} 休息室`;
         
+        let pts = gameState.mapData.housePoints;
+        let dailyPwd = gameState.mapData.passwords[house];
+
         document.getElementById('loc-actions').innerHTML = `
             <button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('消磨时间')">🛋️ 在沙发上休息 (1小时)</button>
             <button class="btn btn-outline" style="width:auto; margin:0;" onclick="enterLocation('宿舍')">🛏️ 前往宿舍</button>
-            <div style="font-size:12px; color:gray; width:100%; margin-top:5px;">今日布告栏: 本院积分 ${Math.floor(Math.random()*150 + 200)} 分</div>
+            
+            <div style="font-size:12px; color:var(--text-color); width:100%; margin-top:10px; padding:8px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; box-shadow:var(--shadow);">
+                <div style="font-weight:bold; margin-bottom:6px; text-align:center;">📌 学院杯布告栏</div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; padding:0 10px;">
+                    <span style="color:#990000; font-weight:bold;">🦁 格兰芬多: ${pts["格兰芬多"]} 分</span>
+                    <span style="color:#006622; font-weight:bold;">🐍 斯莱特林: ${pts["斯莱特林"]} 分</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; padding:0 10px;">
+                    <span style="color:#000099; font-weight:bold;">🦅 拉文克劳: ${pts["拉文克劳"]} 分</span>
+                    <span style="color:#CC9900; font-weight:bold;">🦡 赫奇帕奇: ${pts["赫奇帕奇"]} 分</span>
+                </div>
+                <div style="border-top:1px dashed var(--border-color); padding-top:6px; text-align:center;">
+                    今日进门口令：<span style="font-weight:bold; color:var(--primary-color);">${dailyPwd}</span>
+                </div>
+            </div>
         `;
         renderLocNpcs();
     }
