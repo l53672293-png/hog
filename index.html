@@ -1353,10 +1353,20 @@ c.多人交互对话
         }
 
         if (m.grades) {
-            const age = parseInt(m.age) || 11;
-            const isYear5 = age >= 15; 
-            const reqMap = { dada: "黑防", charms: "魔咒", astronomy: "天文", potions: "魔药", herbology: "草药", history: "魔法史", transfiguration: "变形" };
-            const optMap = { arithmancy: "算数", comc: "神奇动物", divination: "占卜", runes: "古代魔文", muggle: "麻瓜" };
+            const reqMap = { dada: "黑魔法防御术", charms: "魔咒课", astronomy: "天文学", potions: "魔药课", herbology: "草药学", history: "魔法史", transfiguration: "变形术" };
+            const optMap = { arithmancy: "算数占卜", comc: "神奇动物保护", divination: "占卜学", runes: "古代魔文", muggle: "麻瓜研究" };
+
+            // 根据当前回合数推算学年与本周状态 (50周=1年，1-40周为学期，41-50周为暑假)
+            let currentTurn = Math.max(1, gameState.turn);
+            let currentYear = Math.floor((currentTurn - 1) / 50) + 1;
+            let weekInCycle = (currentTurn - 1) % 50 + 1;
+            
+            // 自动记录期末考试成绩
+            if (!m.pastGradesList) m.pastGradesList = [];
+            // 如果恰好推进到第40周(期末)，且本学年成绩还没记录，则自动存档快照
+            if (weekInCycle === 40 && !m.pastGradesList.find(x => x.year === currentYear)) {
+                m.pastGradesList.push({ year: currentYear, grades: JSON.parse(JSON.stringify(m.grades)) });
+            }
 
             let gradeHtml = '<div style="color:gray; margin-bottom:5px;">必修课</div><div class="grade-grid">';
             for (let key in reqMap) {
@@ -1365,27 +1375,36 @@ c.多人交互对话
             }
             gradeHtml += '</div>';
 
-            if (isYear5) {
-                gradeHtml += '<div style="color:gray; margin-top:10px; margin-bottom:5px;">选修课 (五年级及以上)</div><div class="grade-grid">';
-                for (let key in optMap) {
-                    let score = m.grades[key] || 0;
-                    gradeHtml += `<div class="grade-item"><span>${optMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
-                }
-                gradeHtml += '</div>';
+            // 判断选修课是否解锁 (五年级及以上)
+            let isYear5 = currentYear >= 5; 
+            let optStyle = isYear5 ? "" : "opacity: 0.4; filter: grayscale(1); pointer-events: none;";
+            let optTitle = isYear5 ? "选修课" : "选修课 <span style='font-size:11px; color:#990000;'>(五年级/15岁解锁)</span>";
+
+            gradeHtml += `<div style="color:gray; margin-top:10px; margin-bottom:5px;">${optTitle}</div><div class="grade-grid" style="${optStyle}">`;
+            for (let key in optMap) {
+                let score = m.grades[key] || 0;
+                gradeHtml += `<div class="grade-item"><span>${optMap[key]}</span> <span style="color:var(--primary-color)">${getGradeLetter(score)} (${score})</span></div>`;
+            }
+            gradeHtml += '</div>';
+
+            // 渲染过往期末大考成绩
+            gradeHtml += `<div style="color:gray; margin-top:15px; margin-bottom:5px; border-top:1px dashed var(--border-color); padding-top:10px;">🎓 历年期末考总评</div>`;
+            if (m.pastGradesList && m.pastGradesList.length > 0) {
+                m.pastGradesList.forEach(pg => {
+                    gradeHtml += `<div style="font-size:12px; color:var(--text-color); background:rgba(0,0,0,0.03); border:1px solid var(--border-color); border-radius:4px; padding:6px; margin-bottom:6px;">
+                        <div style="font-weight:bold; color:var(--primary-color); margin-bottom:4px;">第 ${pg.year} 学年 期末成绩</div>
+                        <div style="line-height:1.4;">`;
+                    let tempGrades = [];
+                    for(let k in reqMap) if(pg.grades[k] !== undefined) tempGrades.push(`${reqMap[k]}:${getGradeLetter(pg.grades[k])}`);
+                    if (pg.year >= 5) {
+                        for(let k in optMap) if(pg.grades[k] !== undefined) tempGrades.push(`${optMap[k]}:${getGradeLetter(pg.grades[k])}`);
+                    }
+                    gradeHtml += `${tempGrades.join(' | ')}</div></div>`;
+                });
+            } else {
+                gradeHtml += `<div style="font-size:12px; color:gray; text-align:center; padding:10px 0;">暂无记录 (本学年第40周将自动存档)</div>`;
             }
 
-            // 往年成绩折叠显示
-            if (gameState.pastGrades && gameState.pastGrades.length > 0) {
-                gradeHtml += `<div style="margin-top:10px; border-top:1px dashed var(--border-color); padding-top:5px;">
-                    <div style="font-size:12px; color:gray; cursor:pointer; user-select:none;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">▶ 往年成绩单 (点击展开)</div>
-                    <div style="display:none; font-size:11px; margin-top:5px; background:rgba(0,0,0,0.05); padding:5px; border-radius:4px;">`;
-                gameState.pastGrades.forEach((pg, idx) => {
-                    gradeHtml += `<div style="font-weight:bold; color:var(--primary-color); margin-top:5px;">第 ${idx+1} 学年:</div><div style="column-count: 2; margin-bottom:5px;">`;
-                    for(let k in pg) { gradeHtml += `<div>${reqMap[k]||optMap[k]||k}: ${getGradeLetter(pg[k])}</div>`; }
-                    gradeHtml += `</div>`;
-                });
-                gradeHtml += `</div></div>`;
-            }
             document.getElementById('grades-container').innerHTML = gradeHtml;
         }
 
@@ -2189,15 +2208,48 @@ c.多人交互对话
     function openCalendar() {
         if (gameState.turn === 0) { alert("请先开启人生！"); return; }
         saveCurrentToHistory();
-        let html = '<div style="display:flex; flex-direction:column; gap:10px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">';
+        
+        let html = '<div style="max-height: 60vh; overflow-y: auto; padding-right: 5px;">';
         const max = gameState.maxTurn || gameState.turn;
+
+        // 对所有周数进行分组：50周一个轮回，1-40学期，41-50假期
+        let groups = {};
         for (let i = 1; i <= max; i++) {
-            const isCurrent = (i === gameState.turn) ? 'background-color: var(--primary-color); color: white;' : '';
-            html += `<div style="display:flex; gap:5px;">
-                <button class="btn btn-outline" style="margin:0; flex:1; ${isCurrent}" onclick="jumpToWeek(${i})">第 ${i} 周</button>
-                <button class="btn btn-outline" style="margin:0; width:auto; color:#990000; border-color:#990000;" onclick="deleteWeek(${i})">🗑️ 删除</button>
-            </div>`;
+            let cycle = Math.floor((i - 1) / 50); 
+            let weekInCycle = (i - 1) % 50 + 1; 
+            
+            let isTerm = weekInCycle <= 40;
+            let groupName = isTerm ? `第 ${cycle + 1} 学年` : `第 ${cycle + 1} 个暑假`;
+            let groupKey = `${cycle}-${isTerm ? 'term' : 'holiday'}`;
+            
+            if (!groups[groupKey]) groups[groupKey] = { name: groupName, weeks: [] };
+            groups[groupKey].weeks.push(i);
         }
+
+        // 渲染折叠面板 (为了体验，默认展开包含当前周的组)
+        for (let key in groups) {
+            let g = groups[key];
+            let hasCurrentTurn = g.weeks.includes(gameState.turn);
+            let openClass = hasCurrentTurn ? "open" : "";
+            
+            html += `
+            <div class="social-category" style="margin-bottom:8px;">
+                <div class="social-category-header" onclick="this.nextElementSibling.classList.toggle('open')" style="padding:10px;">
+                    <span>📅 ${g.name} (${g.weeks.length}周)</span><span>▼</span>
+                </div>
+                <div class="social-category-content ${openClass}">
+                    <div style="display:flex; flex-direction:column; gap:6px; padding:8px;">`;
+            
+            g.weeks.forEach(i => {
+                const isCurrent = (i === gameState.turn) ? 'background-color: var(--primary-color); color: white;' : '';
+                html += `<div style="display:flex; gap:5px;">
+                    <button class="btn btn-outline" style="margin:0; flex:1; ${isCurrent}" onclick="jumpToWeek(${i})">第 ${i} 周</button>
+                    <button class="btn btn-outline" style="margin:0; width:auto; color:#990000; border-color:#990000;" onclick="deleteWeek(${i})">🗑️ 删除</button>
+                </div>`;
+            });
+            html += `</div></div></div>`;
+        }
+        
         html += '</div>';
         document.getElementById('modalContent').style.display = 'none'; 
         openModal("📅 霍格沃茨日历", html);
