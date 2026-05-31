@@ -1416,8 +1416,12 @@ c.多人交互对话
         const optContainer = document.getElementById('storyOptions');
         if(gameState.story.options && gameState.story.options.length > 0) {
             let html = '';
+            const labels = ['A', 'B', 'C', 'D', 'E'];
             gameState.story.options.forEach((opt, index) => {
-                html += `<button class="btn" onclick="selectOption('${opt}')">[选项${index+1}] ${opt}</button>`;
+                let lbl = labels[index] || String.fromCharCode(65 + index);
+                // 剔除AI可能自作主张加的 "A." 或 "选项1" 前缀，保证UI绝对干净统一
+                let cleanOpt = opt.replace(/^[A-E][\.、\s]+/, '').replace(/^选项\d+[\.、\s]+/, '').trim();
+                html += `<button class="btn" onclick="selectOption('${cleanOpt}')">[${lbl}] ${cleanOpt}</button>`;
             });
             // 暑假跳过按钮逻辑
             let weekInYear = gameState.turn === 0 ? 0 : ((gameState.turn - 1) % 50 + 1);
@@ -5958,7 +5962,7 @@ ${JSON.stringify(gameState.main)}
     };
     window.openFloatingEnvelope = function() { window.showEnvelope(); };
 
-    // 10. 剧情防清零、智能识别加减分、暧昧联动、动态字数与绝对强制格式
+    // 10. 剧情防清零、智能识别加减分、社交/背包数据加固、动态字数与绝对强制格式
     window.callAPI = async function(userPrompt, isRegenerate = false) {
         const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
         const key = document.getElementById('apiKey').value;
@@ -5970,58 +5974,59 @@ ${JSON.stringify(gameState.main)}
         
         const backupAttrs = JSON.parse(JSON.stringify(gameState.main.attributes || {}));
         const backupGrades = JSON.parse(JSON.stringify(gameState.main.grades || {}));
-        const backupNpcs = JSON.parse(JSON.stringify(gameState.npcs || []));
 
         let romanceList = gameState.npcs.filter(n => n.romanceState === 'ambiguous').map(n => n.name).join('、');
         let datingList = gameState.npcs.filter(n => n.romanceState === 'dating').map(n => n.name).join('、');
         let romancePrompt = "";
-        if(romanceList) romancePrompt += `你正和 ${romanceList} 处于暧昧期！请在互动中深刻体现出脸红心跳、特殊的暧昧拉扯。\n`;
-        if(datingList) romancePrompt += `你和 ${datingList} 是正式恋人！互动中请深刻体现出亲密、爱意与专属情节。\n`;
+        if(romanceList) romancePrompt += `【恋爱预警】你正和 ${romanceList} 处于暧昧期！请在互动中深刻体现出脸红心跳、特殊的暧昧拉扯。\n`;
+        if(datingList) romancePrompt += `【恋爱预警】你和 ${datingList} 是正式恋人！互动中请深刻体现出亲密、爱意与专属情节。\n`;
 
         let currentTurnForPrompt = isRegenerate ? gameState.turn : (gameState.turn + 1);
         let yearNum = Math.floor((currentTurnForPrompt - 1) / 50) + 1;
         let weekInYear = (currentTurnForPrompt - 1) % 50 + 1;
         let timeConstraint = `当前为第 ${yearNum} 学年的第 ${weekInYear} 周。注意：每学年的前40周必须在校内推进主线，第41-50周为假期，剧情必须发生在校外！`;
 
-        // 读取自定义字数
         let targetWords = (gameState.settings.customOptions && gameState.settings.customOptions.targetWords) ? gameState.settings.customOptions.targetWords : 3000;
 
         let systemPrompt = `你是一个完全符合《哈利波特》原著的文字养成引擎。
-请严格遵守以下规则，并且绝对不要改变我要求的JSON返回格式：
-${typeof coreReferenceText !== 'undefined' ? coreReferenceText : ''}
+【最高优先级指令】：
+1. 绝对遵从玩家的【人物设定】：${gameState.characterLore || "普通的霍格沃茨新生"}。你生成的剧情、NPC的反应都必须100%基于此设定，绝对不允许无视设定自说自话！
+2. 选项(options)必须提供4到5个。每个选项严格控制在40个字以内！必须简短连贯，绝对禁止嵌套小选项，绝对不允许话说一半或字数被截断！
+3. 社交(npcs)和背包(inventory)只需返回【本周有数值变化、新增或互动】的对象，不要返回所有人。
+4. 返回格式必须绝对稳定，严格遵守给定的JSON骨架，严禁掉格式。
 
-【时间线约束】：${timeConstraint}
+【时间与状态约束】
+${timeConstraint}
 ${romancePrompt}
-
-1. 属性(attributes)和成绩(grades)必须保留原状，不要无故修改。
-2. 状态(status)包括 magic, stamina, mood, health, reputation(0-100)。引人注目的行为会修改 reputation。
-3. 必须在剧情文末明确写出所有的数值变动，例如：“体力-10。由于炸毁坩埚，声望-5。斯莱特林扣10分。”
+- 属性(attributes)和成绩(grades)必须保留原状。
+- 状态(status)包括 magic, stamina, mood, health, reputation(0-100)。
+- 必须在剧情文末标明所有数值变动，例如：“体力-10。由于炸毁坩埚，声望-5。斯莱特林扣10分。”
 
 【输出格式绝对强制要求】
-你必须且只能输出一个合法的JSON对象，不要包含任何Markdown标记（如 \`\`\`json ），不要有任何前言后语。JSON格式结构必须严格如下：
+必须且只能输出合法的JSON对象，无Markdown，无前言后语。严格如下：
 {
   "main": {
-    "era": "时代背景(150字内完整写完,勿截断)", "time": "当前时间", "location": "当前地点", "weather": "天气", "news": "热点事件(150字内完整写完,勿截断)",
-    "name": "姓名", "blood": "血统", "age": "年龄", "appearance": "外貌(150字内完整写完,勿截断)", "family": "家族", "assets": "资产",
+    "era": "时代背景(150字内)", "time": "当前时间", "location": "当前地点", "weather": "天气", "news": "热点事件(150字内)",
+    "name": "姓名", "blood": "血统", "age": "年龄", "appearance": "外貌(150字内)", "family": "家族", "assets": "资产",
     "wand": "魔杖", "talent": "天赋", "special": "特殊", "record": "档案",
-    "log": "周日常互动日志",
+    "log": "周日常日志",
     "attributes": { "dada": 0, "darkArts": 0, "transfiguration": 0, "divination": 0, "potions": 0, "charms": 0 },
     "status": { "magic": 100, "stamina": 100, "mood": 100, "health": 100, "reputation": 50 },
     "grades": { "dada": 0, "charms": 0, "astronomy": 0, "potions": 0, "herbology": 0, "history": 0, "transfiguration": 0, "arithmancy": 0, "comc": 0, "divination": 0, "runes": 0, "muggle": 0 }
   },
   "story": {
-    "text": "本周的剧情描述，要求在 ${targetWords} 字以内完成（上下浮动50字）。必须在设定的字数内完整生成完毕，绝对不可突然截断出现话说一半的情况！如有数值变动需在文末注明。",
-    "options": ["选项1", "选项2", "选项3", "选项4", "选项5"]
+    "text": "本周剧情描述，要求在 ${targetWords} 字以内完成(上下浮动50字)。必须在字数内完整写完，绝不可中途截断！文末标明数值变动。",
+    "options": ["动作简述1(限40字内完整连贯)", "动作简述2(不许嵌套小选项)", "动作简述3", "动作简述4"]
   },
   "inventory": [
-    {"id": 1, "name": "物品名", "desc": "描述", "effect": "效果", "amount": 1}
+    {"name": "物品名", "desc": "描述", "effect": "效果", "amount": 1}
   ],
   "npcs": [
-    {"id": 1, "name": "NPC名", "house": "学院", "relation": 50, "desc": "描述", "category": "校内"}
+    {"name": "NPC名", "house": "学院", "relation": 50, "desc": "描述", "category": "校内"}
   ]
 }
 
-当前状态：
+当前状态参照：
 ${JSON.stringify(gameState.main)}`;
 
         try {
@@ -6030,6 +6035,7 @@ ${JSON.stringify(gameState.main)}`;
             let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
             let parsedData = JSON.parse(replyText);
             
+            // 数据防清零：主控状态
             if(parsedData.main) {
                 if(!parsedData.main.attributes) parsedData.main.attributes = {};
                 if(!parsedData.main.grades) parsedData.main.grades = {};
@@ -6041,17 +6047,37 @@ ${JSON.stringify(gameState.main)}`;
                 if (typeof updateTraits === "function") updateTraits();
             }
             if(parsedData.story) gameState.story = parsedData.story;
-            if(parsedData.inventory) gameState.inventory = parsedData.inventory;
             
-            if(parsedData.npcs) {
-                parsedData.npcs.forEach(n => {
-                    let oldNpc = backupNpcs.find(old => old.name === n.name);
-                    if (oldNpc) {
-                        if (oldNpc.romanceState) n.romanceState = oldNpc.romanceState;
-                        if (oldNpc.chatHistory) n.chatHistory = oldNpc.chatHistory;
+            // 【核心修复】背包数据加固：增量融合，绝对不覆盖！
+            if(parsedData.inventory && Array.isArray(parsedData.inventory)) {
+                parsedData.inventory.forEach(newItem => {
+                    let existing = gameState.inventory.find(i => i.name === newItem.name);
+                    if (existing) {
+                        existing.amount = (existing.amount || 0) + (newItem.amount || 1);
+                        if (newItem.desc) existing.desc = newItem.desc;
+                        if (newItem.effect) existing.effect = newItem.effect;
+                    } else {
+                        if (!newItem.id) newItem.id = Date.now() + Math.floor(Math.random() * 10000);
+                        gameState.inventory.push(newItem);
                     }
                 });
-                gameState.npcs = parsedData.npcs;
+            }
+
+            // 【核心修复】社交NPC数据加固：增量更新，保留旧好感与所有未提及NPC！
+            if(parsedData.npcs && Array.isArray(parsedData.npcs)) {
+                parsedData.npcs.forEach(newNpc => {
+                    let existing = gameState.npcs.find(n => n.name === newNpc.name);
+                    if (existing) {
+                        if (newNpc.relation !== undefined) existing.relation = newNpc.relation;
+                        if (newNpc.desc) existing.desc = newNpc.desc;
+                        if (newNpc.house) existing.house = newNpc.house;
+                        if (newNpc.category) existing.category = newNpc.category;
+                    } else {
+                        if (!newNpc.id) newNpc.id = Date.now() + Math.floor(Math.random() * 10000);
+                        if (!newNpc.chatHistory) newNpc.chatHistory = [];
+                        gameState.npcs.push(newNpc);
+                    }
+                });
             }
             
             // 智能识别学院加扣分
@@ -6067,10 +6093,8 @@ ${JSON.stringify(gameState.main)}`;
                     let match;
                     let regexGeneral = /学院分?\s*([+-])\s*(\d+)/g;
                     while ((match = regexGeneral.exec(storyText)) !== null) md.housePoints[mcHouse] = Math.max(0, md.housePoints[mcHouse] + (match[1] === '+' ? 1 : -1) * parseInt(match[2]));
-                    
                     let regexSpecific = /(格兰芬多|斯莱特林|拉文克劳|赫奇帕奇)[\s分]*([+-])\s*(\d+)/g;
                     while ((match = regexSpecific.exec(storyText)) !== null) md.housePoints[match[1]] = Math.max(0, md.housePoints[match[1]] + (match[2] === '+' ? 1 : -1) * parseInt(match[3]));
-                    
                     let regexWord = /(格兰芬多|斯莱特林|拉文克劳|赫奇帕奇)?(?:学院)?\s*(加|扣|减去)\s*(\d+)\s*分/g;
                     while ((match = regexWord.exec(storyText)) !== null) md.housePoints[match[1] || mcHouse] = Math.max(0, md.housePoints[match[1] || mcHouse] + (match[2] === '加' ? 1 : -1) * parseInt(match[3]));
                 }
