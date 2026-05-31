@@ -3104,30 +3104,69 @@ ${JSON.stringify(gameState.main)}
         let npcs = [];
         let count = Math.floor(Math.random() * 4) + 4; 
         
-        let known = gameState.npcs.filter(n => n.category === "校内");
+        let loc = gameState.mapData.currentLoc || "";
+        let houseFilter = null;
+        if (loc.includes("格兰芬多")) houseFilter = "格兰芬多";
+        else if (loc.includes("斯莱特林")) houseFilter = "斯莱特林";
+        else if (loc.includes("拉文克劳")) houseFilter = "拉文克劳";
+        else if (loc.includes("赫奇帕奇")) houseFilter = "赫奇帕奇";
+
+        // 核心修复与升级：绝不偷懒的丰富动作库
+        let actions = [
+            "正在翻阅一本厚厚的魔法书", 
+            "正在小声练习魔杖手势", 
+            "匆匆忙忙地赶路，像要迟到了", 
+            "似乎在寻找丢失的羽毛笔", 
+            "靠在墙上闭目养神", 
+            "盯着窗外的景色若有所思", 
+            "正在整理弄皱的校袍", 
+            "手里拿着羊皮纸写写画画", 
+            "正在吃一颗比比多味豆，表情很怪",
+            "正在仔细观察周围的画像", 
+            "百无聊赖地打了个大哈欠"
+        ];
+
+        let known = gameState.npcs.filter(n => n.category === "校内" && (!houseFilter || n.house === houseFilter));
         if (known.length > 0 && Math.random() > 0.3) {
-            npcs.push({ id: known[0].id, name: known[0].name, isKnown: true, action: "正在发呆" });
+            let rndKnown = known[Math.floor(Math.random() * known.length)];
+            // 彻底去除“正在发呆”的死设定，改为从丰富动作库中随机抽取
+            npcs.push({ 
+                id: rndKnown.id, 
+                name: rndKnown.name, 
+                isKnown: true, 
+                action: actions[Math.floor(Math.random() * actions.length)], 
+                house: rndKnown.house 
+            });
         }
 
         for (let i = npcs.length; i < count; i++) {
             let isMale = Math.random() > 0.5;
+            if (loc === "女生宿舍") isMale = false; 
+
             let f = isMale ? firstNamesM[Math.floor(Math.random()*firstNamesM.length)] : firstNamesF[Math.floor(Math.random()*firstNamesF.length)];
             let l = lastNames[Math.floor(Math.random()*lastNames.length)];
-            let actions = ["正在看书","四处张望","正在和别人聊天","似乎在找东西","行色匆匆"];
+            
+            let npcHouse = houseFilter ? houseFilter : ["格兰芬多", "斯莱特林", "拉文克劳", "赫奇帕奇"][Math.floor(Math.random() * 4)];
+
             npcs.push({
-                id: Date.now() + i,
+                id: Date.now() + i + Math.floor(Math.random()*10000), 
                 name: `${f}·${l}`,
                 isKnown: false,
-                action: actions[Math.floor(Math.random()*actions.length)]
+                // 路人也同样享受丰富的动作库
+                action: actions[Math.floor(Math.random() * actions.length)],
+                house: npcHouse,
+                genderDesc: isMale ? "男同学" : "女同学"
             });
         }
 
-        let pairCount = Math.floor(count / 2);
-        for(let i=0; i<pairCount; i+=2){
-             npcs[i].action = `正在和 ${npcs[i+1].name} 悄悄讨论着什么`;
-             npcs[i+1].action = `正在和 ${npcs[i].name} 悄悄讨论着什么`;
-             npcs[i].pairId = npcs[i+1].id;
-             npcs[i+1].pairId = npcs[i].id;
+        // 保持极低概率的配对聊天，防止霸屏
+        if (npcs.length >= 2 && Math.random() < 0.3) {
+            let idx1 = npcs.length - 1;
+            let idx2 = npcs.length - 2;
+            npcs[idx1].action = `正在和 ${npcs[idx2].name} 悄悄讨论着什么`;
+            npcs[idx2].action = `正在和 ${npcs[idx1].name} 悄悄讨论着什么`;
+            npcs[idx1].pairId = npcs[idx2].id;
+            npcs[idx2].pairId = npcs[idx1].id;
         }
 
         return npcs;
@@ -3875,7 +3914,7 @@ ${JSON.stringify(gameState.main)}
     });
     
     // ========================================================== //
-    // ==== 恋爱表白、全新分步约见、带礼物剧情生成 终极补丁 ==== //
+    // ==== 恋爱、约见、信封、防成绩清零、学科请教 终极全能补丁 ==== //
     // ========================================================== //
 
     const romanceStyle = document.createElement('style');
@@ -3885,7 +3924,6 @@ ${JSON.stringify(gameState.main)}
         
         #floating-widget { position: fixed; right: 20px; top: 80px; width: 45px; height: 45px; background: #1a1a1a; color: white; border: 2px solid #ffffff; border-radius: 50%; display: none; justify-content: center; align-items: center; cursor: pointer; z-index: 1001; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 20px; animation: fadeIn 0.3s; }
         
-        /* 高级白色质感信封 */
         #envelope-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: center; flex-direction: column; }
         .envelope-box { width: 340px; height: 220px; background: #fdfdfd; border: 1px solid #dcdcdc; border-radius: 4px; position: relative; cursor: pointer; transition: transform 0.5s; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
         .envelope-flap { position: absolute; top: 0; left: 0; width: 0; height: 0; border-left: 170px solid transparent; border-right: 170px solid transparent; border-top: 110px solid #ececec; transform-origin: top; transition: transform 0.8s; z-index: 3; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
@@ -3907,18 +3945,100 @@ ${JSON.stringify(gameState.main)}
         </div>
     `);
 
-    // --- UI覆写 ---
+    // --- 1. 防止大模型清空成绩的强制拦截与重写 ---
+    window.callAPI = async function(userPrompt, isRegenerate = false) {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+
+        if(!url || !key || !model) { alert("请配置API！"); return; }
+        gameState.lastPrompt = userPrompt;
+        document.getElementById('storyText').innerText = "命运编织中，请稍候...";
+        
+        // 【核心修复】：备份调用前所有的属性和成绩，以防被清零
+        const backupAttrs = JSON.parse(JSON.stringify(gameState.main.attributes || {}));
+        const backupGrades = JSON.parse(JSON.stringify(gameState.main.grades || {}));
+
+        // 核心修复：防止之前缺失声望数值，强制保底 50
+        if (gameState.main.status && gameState.main.status.reputation === undefined) {
+            gameState.main.status.reputation = 50;
+        }
+
+        let systemPrompt = `你是一个完全符合《哈利波特》原著的文字养成游戏引擎。
+请遵守以下状态规则：
+1. 个人属性(attributes)和成绩(grades)必须保留原状，平时不要随意增加！
+2. 状态(status)包括 magic, stamina, mood, health, reputation(声望)。所有范围均为0-100。声望的高低决定了其他学生对你的态度和你的校园地位。
+3. 你的剧情生成必须深刻体现这些状态的影响！如果剧情中你做出了引人注目的事（如出风头、赢了比赛或被狠狠扣分），你必须在返回的JSON中修改 reputation 的值。
+4. 必须在剧情文末明确写出所有的数值变动，例如：“上了一节魔药课，体力-10。由于炸毁了坩埚，声望-5”。
+5. 社交NPC的category必须是"校内"、"校外"或"宠物"之一。
+6. 面板(main)内的属性描述必须绝对精简，控制在150字内！
+当前状态：
+${JSON.stringify(gameState.main)}
+要求只输出纯JSON对象，格式同输入，不带任何Markdown符号。`;
+
+        try {
+            const response = await fetch(`${url}/v1/chat/completions`, { method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], temperature: 0.7 }) });
+            let data = await response.json();
+            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            
+            let parsedData = JSON.parse(replyText);
+            
+            // 【核心修复】：强行恢复丢失的成绩和属性
+            if(parsedData.main) {
+                if(!parsedData.main.attributes) parsedData.main.attributes = {};
+                if(!parsedData.main.grades) parsedData.main.grades = {};
+                
+                for(let k in backupAttrs) { parsedData.main.attributes[k] = Math.max(backupAttrs[k], parsedData.main.attributes[k] || 0); }
+                for(let k in backupGrades) { parsedData.main.grades[k] = Math.max(backupGrades[k], parsedData.main.grades[k] || 0); }
+                
+                gameState.main = parsedData.main;
+                if(!gameState.main.status) gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+                if (typeof updateTraits === "function") updateTraits();
+            }
+            if(parsedData.story) gameState.story = parsedData.story;
+            if(parsedData.inventory) gameState.inventory = parsedData.inventory;
+            if(parsedData.npcs) gameState.npcs = parsedData.npcs;
+            
+            if (!isRegenerate) { gameState.turn++; gameState.maxTurn = gameState.turn; }
+            if (typeof saveCurrentToHistory === "function") saveCurrentToHistory(); 
+            updateUI();
+        } catch (error) { document.getElementById('storyText').innerText = "生成失败：" + error.message; }
+    };
+
+    // 重新绑定全局按钮调用
+    window.startGame = function() {
+        if(gameState.turn > 0 && !confirm("确定要重新开启人生吗？")) return;
+        gameState.turn = 0; gameState.maxTurn = 0; gameState.history = []; gameState.turnDrafts = [];
+        gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+        if (typeof updateTraits === "function") updateTraits();
+        window.callAPI(`请根据设定随机生成初始身份（11岁，等待入学通知书），并开始第一周。请生成不少于3000字的细腻剧情。
+请根据本次时代背景，在npcs数组中放入至少5名符合该世代的《哈利波特》著名同期同学，设为'校内'，好感0。`);
+        switchTab('story', document.querySelectorAll('.nav-item')[1]);
+    };
+    window.selectOption = function(optText) {
+        if (gameState.main.status && gameState.main.status.stamina < 10) { alert("体力不支，无法行动！"); return; }
+        if (typeof saveCurrentToHistory === "function") saveCurrentToHistory();
+        gameState.history.length = gameState.turn; gameState.maxTurn = gameState.turn; gameState.turnDrafts = [];
+        window.callAPI(`我选择了选项：【${optText}】。请推进下一周，生成剧情并更新状态。`);
+    };
+    window.submitCustomAction = function() {
+        const action = document.getElementById('customActionInput').value.trim();
+        if(!action) return;
+        document.getElementById('customActionInput').value = '';
+        if (typeof saveCurrentToHistory === "function") saveCurrentToHistory();
+        gameState.history.length = gameState.turn; gameState.maxTurn = gameState.turn; gameState.turnDrafts = [];
+        window.callAPI(`我采取行动：【${action}】。请根据行动推进下一周，生成剧情并更新状态。`);
+    };
+
+    // --- 2. UI覆写：渲染红心并排除宠物 ---
     const originalUpdateUI = window.updateUI;
     window.updateUI = function() {
-        originalUpdateUI(); 
+        if (originalUpdateUI) originalUpdateUI(); 
         const socList = document.getElementById('socialList');
         if(!socList) return;
         
         socList.innerHTML = '';
-        if(gameState.npcs.length === 0) {
-            socList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>';
-            return;
-        }
+        if(gameState.npcs.length === 0) { socList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>'; return; }
         
         const categories = { '恋人': [], '老师': [], '同学': [], '校外': [], '宠物': [] };
         gameState.npcs.forEach(npc => {
@@ -3929,7 +4049,7 @@ ${JSON.stringify(gameState.main)}
             let cat = npc.category || '校内';
             if (cat === '校内') {
                 let descStr = (npc.desc || "") + (npc.house || "");
-                if (descStr.includes("教授") || descStr.includes("老师") || descStr.includes("校长") || descStr.includes("教职工") || descStr.includes("管理员")) { categories['老师'].push(npc); } 
+                if (descStr.includes("教授") || descStr.includes("老师") || descStr.includes("校长")) { categories['老师'].push(npc); } 
                 else { categories['同学'].push(npc); }
             } else if (categories[cat]) { categories[cat].push(npc); } 
             else { categories['校外'].push(npc); }
@@ -3946,16 +4066,16 @@ ${JSON.stringify(gameState.main)}
             
             categories[cat].forEach(npc => {
                 let heartHtml = '';
-                if (npc.relation >= 100 && !npc.romanceState) {
-                    heartHtml = `<span class="pulse-heart" onclick="event.stopPropagation(); triggerRomance(${npc.id}, 'ambiguous')">♡</span>`;
-                } else if (npc.romanceState === 'ambiguous') {
-                    if (npc.relation >= 200) {
-                        heartHtml = `<span class="pulse-heart" style="color:red; font-size:16px; font-weight:bold;" onclick="event.stopPropagation(); triggerConfessChoice(${npc.id})">♥</span>`;
-                    } else {
-                        heartHtml = `<span style="color:#e91e63; margin-left:5px;">♡</span>`;
+                // 【核心修复】：宠物绝对不允许出现红心
+                if (cat !== '宠物' && npc.category !== '宠物') {
+                    if (npc.relation >= 100 && !npc.romanceState) {
+                        heartHtml = `<span class="pulse-heart" onclick="event.stopPropagation(); triggerRomance(${npc.id}, 'ambiguous')">♡</span>`;
+                    } else if (npc.romanceState === 'ambiguous') {
+                        if (npc.relation >= 200) { heartHtml = `<span class="pulse-heart" style="color:red; font-size:16px; font-weight:bold;" onclick="event.stopPropagation(); triggerConfessChoice(${npc.id})">♥</span>`; } 
+                        else { heartHtml = `<span style="color:#e91e63; margin-left:5px;">♡</span>`; }
+                    } else if (npc.romanceState === 'dating') {
+                        heartHtml = `<span style="color:red; margin-left:5px;">💖</span>`;
                     }
-                } else if (npc.romanceState === 'dating') {
-                    heartHtml = `<span style="color:red; margin-left:5px;">💖</span>`;
                 }
                 catHtml += `<div class="list-item" onclick="showNPC(${npc.id})">
                     <span>${npc.name}${heartHtml}</span> 
@@ -3967,211 +4087,105 @@ ${JSON.stringify(gameState.main)}
         }
     };
 
-    window.openChat = function(id) {
-        const npc = gameState.npcs.find(n => n.id === id);
-        if(!npc) return;
-        if(!npc.chatHistory) npc.chatHistory = [];
-        
-        let chatHtml = `<div class="chat-box" id="chatBox_${id}">`;
-        npc.chatHistory.forEach(msg => {
-            if (msg.type === 'system') chatHtml += `<div class="chat-msg system">${msg.text}</div>`;
-            else if (msg.type === 'redpack') chatHtml += `<div class="chat-redpack"><span class="chat-redpack-icon">🧧</span><div><div style="font-weight:bold;">${msg.title}</div><div style="font-size:11px;">${msg.amount}</div></div></div>`;
-            else if (msg.type === 'envelope') chatHtml += `<div class="chat-msg npc" style="cursor:pointer; background:#f0f0f0; color:#333; border:1px solid #ccc; text-align:center; padding:12px; border-radius:4px; font-weight:bold; letter-spacing:2px; box-shadow:0 2px 5px rgba(0,0,0,0.1);" onclick="readEnvelope(${id}, ${msg.envId})">✉️ 收到一封信件 (拆开)</div>`;
-            else chatHtml += `<div class="chat-msg ${msg.role}">${msg.text}</div>`;
-        });
-        chatHtml += `</div>
-        <div style="display:flex; gap:5px; margin-bottom:5px;">
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0;" onclick="askMoney(${id})">要钱</button>
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0;" onclick="openMeetSystem(${id})">约见</button>
-        </div>
-        <div style="display:flex; gap:5px; margin-bottom:5px;">
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0; border-color:#e91e63; color:#e91e63;" onclick="openConfessOnline(${id})">💌 线上表白</button>
-        </div>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="chatInput_${id}" placeholder="${npc.isWaitingMcConfess ? '落笔写下你的告白信...' : '写信内容...'}" style="margin:0; flex:1;">
-            <button class="btn" style="width:auto; margin:0;" onclick="sendChat(${id})">发送</button>
-        </div>`;
-        
-        openModal(`✉️ 与 ${npc.name} 通信`, chatHtml, `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="showNPC(${id})">返回档案</button>`);
-        setTimeout(() => { const box = document.getElementById(`chatBox_${id}`); if(box) box.scrollTop = box.scrollHeight; }, 100);
+    // --- 3. 教师办公室与学科双绑定机制 ---
+    const getProfSubject = (name) => {
+        if(name.includes("麦格")) return { key: "transfiguration", n: "变形术" };
+        if(name.includes("斯内普")||name.includes("斯拉格霍恩")) return { key: "potions", n: "魔药课" };
+        if(name.includes("弗立维")) return { key: "charms", n: "魔咒课" };
+        if(name.includes("斯普劳特")) return { key: "herbology", n: "草药学" };
+        if(name.includes("特里劳妮")) return { key: "divination", n: "占卜学" };
+        if(name.includes("宾斯")) return { key: "history", n: "魔法史" };
+        if(name.includes("辛尼斯塔")) return { key: "astronomy", n: "天文学" };
+        if(name.includes("邓布利多")||name.includes("卢平")||name.includes("奇洛")||name.includes("穆迪")||name.includes("洛哈特")) return { key: "dada", n: "黑魔法防御术" };
+        return { key: "charms", n: "通用魔咒" };
     };
 
-    const originalSendChat = window.sendChat;
-    window.sendChat = async function(id) {
-        const npc = gameState.npcs.find(n => n.id === id);
-        if(npc && npc.isWaitingMcConfess) {
-            const input = document.getElementById(`chatInput_${id}`);
-            const text = input.value.trim();
-            if(!text) return;
-            input.value = '';
-            npc.isWaitingMcConfess = false;
-            npc.chatHistory.push({ role: 'user', text: `[表白信] ${text}` });
-            npc.chatHistory.push({ role: 'system', text: '对方正在输入中...' });
-            openChat(id);
-            executeConfessAPIOnline(id, 'mc', text);
-            return;
+    window.enterOffices = async function() {
+        if (!gameState.mapData.professors) {
+            gameState.mapData.professors = ["米勒娃·麦格", "西弗勒斯·斯内普", "菲利乌斯·弗立维", "波莫娜·斯普劳特", "西比尔·特里劳妮", "莱姆斯·卢平"];
         }
-        if(originalSendChat) originalSendChat(id);
-    };
-
-    window.initVivianItems = function() {
-        return [
-            { name: "迷情剂", cost: "30 金加隆", desc: "极度危险的爱情魔药。", effect: "大幅增加好感", stock: 1 },
-            { name: "生死水", cost: "25 金加隆", desc: "强效安眠药。", effect: "体力+50, 健康-10", stock: 1 },
-            { name: "吐真剂", cost: "50 金加隆", desc: "三滴即可吐露秘密。", effect: "审问道具", stock: 1 },
-            { name: "福灵剂", cost: "100 金加隆", desc: "液态好运。", effect: "全属性+50", stock: 1 },
-            { name: "复方汤剂", cost: "40 金加隆", desc: "可变成他人样子。", effect: "伪装", stock: 2 },
-            { name: "厄里斯的悔药", cost: "150 金加隆", desc: "极度昂贵的禁忌药，可修补破裂的暧昧/表白。", effect: "重置红心状态", stock: 1 }
-        ];
-    };
-    window.refreshVivianShop = function() {
-        gameState.mapData.vivian.items = initVivianItems();
-        gameState.mapData.vivian.items.forEach(i => {
-            let itemKnuts = getMoneyInKnuts(i.cost);
-            let prob = Math.max(0.1, 1 - (itemKnuts / 60000)); 
-            if (Math.random() > prob) i.stock = 0;
-            else i.stock = Math.floor(Math.random() * i.stock) + 1;
-        });
-        gameState.mapData.vivian.lastRefreshTurn = gameState.turn;
-        openVivianShop();
-        alert("薇薇安从大衣深处掏出了一批新玩意儿！");
-    };
-
-    const originalSendGift = window.sendGift;
-    window.sendGift = async function(npcId, itemId) {
-        const item = gameState.inventory.find(i => i.id === itemId);
-        const npc = gameState.npcs.find(n => n.id === npcId);
-        if (item && item.name === "厄里斯的悔药" && npc) {
-            if (npc.romanceState === 'rejected' || npc.romanceState === 'ambiguous_rejected') {
-                npc.romanceState = npc.romanceState === 'rejected' ? undefined : 'ambiguous';
-                if(!npc.chatHistory) npc.chatHistory = [];
-                npc.chatHistory.push({ type: 'system', text: `[${npc.name} 收下了厄里斯的悔药，曾经的隔阂已烟消云散...]` });
-                alert("禁忌魔药生效了，感情出现了转机！");
-            }
-        }
-        if(originalSendGift) originalSendGift(npcId, itemId);
-    };
-
-    // --- 关系抉择与约见系统(分步版) ---
-    window.triggerRomance = function(id, type) {
-        const npc = gameState.npcs.find(n => n.id === id);
-        let html = `<button class="btn btn-outline" style="width:auto; padding:4px 12px; margin:0;" onclick="rejectRomance(${id}, 'ambiguous')">还是不了</button>
-                    <button class="btn" style="width:auto; padding:4px 12px; margin:0; background:#e91e63;" onclick="acceptRomance(${id}, 'ambiguous')">是</button>`;
-        openModal("💕 开启暧昧期", `你与 ${npc.name} 好感已满，是否开启暧昧期？<br><br><span style="color:gray;font-size:11px;">(选"还是不了"将关闭机会，日后反悔需向薇薇安购买昂贵道具)</span>`, html);
-    };
-    window.rejectRomance = function(id, type) {
-        const npc = gameState.npcs.find(n => n.id === id);
-        if(type==='ambiguous') npc.romanceState = 'rejected';
-        if(type==='confess') npc.romanceState = 'ambiguous_rejected';
-        updateUI(); closeModal();
-    };
-    window.acceptRomance = function(id, type) {
-        const npc = gameState.npcs.find(n => n.id === id);
-        npc.romanceState = 'ambiguous'; updateUI(); closeModal();
-    };
-    window.triggerConfessChoice = function(id) {
-        let html = `<button class="btn btn-outline" style="margin-bottom:8px;" onclick="rejectRomance(${id}, 'confess')">还是暧昧吧</button>
-                    <button class="btn" style="margin-bottom:8px; background:#e91e63;" onclick="chooseConfessWay(${id}, 'meet')">约见表白 (线下)</button>
-                    <button class="btn" style="background:#cc0052;" onclick="chooseConfessWay(${id}, 'online')">线上表白 (写信)</button>`;
-        openModal("💖 表白抉择", "终于到了这一步，你想以什么方式捅破窗户纸？", html);
-    };
-    window.chooseConfessWay = function(id, way) {
-        closeModal();
-        if (way === 'meet') openChat(id); 
-        if (way === 'online') openConfessOnline(id);
-    };
-
-    window.openMeetSystem = function(id) {
-        let html = `
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <button class="btn btn-outline" onclick="selectMeetPurpose(${id}, '表白')">💌 表白</button>
-                <button class="btn btn-outline" onclick="selectMeetPurpose(${id}, '再次表白')">💌 再次表白</button>
-                <button class="btn btn-outline" style="color:gray; border-color:gray; cursor:not-allowed;" disabled>更多目的敬请期待</button>
-            </div>
-        `;
-        openModal("📅 约见目的", html);
-    };
-
-    window.selectMeetPurpose = function(id, purpose) {
-        if (purpose === '表白' || purpose === '再次表白') {
-            const npc = gameState.npcs.find(n => n.id === id);
-            let genderStr = (npc.desc && npc.desc.includes('女')) ? '她' : '他';
-            let html = `
-                <div style="text-align:center; position:relative;">
-                    <div style="position:absolute; right:0px; top:-40px; cursor:pointer; font-size:22px; color:gray;" onclick="openMeetSystem(${id})">×</div>
-                    <p style="margin-bottom:15px; font-weight:bold;">是谁来表白？</p>
-                    <button class="btn btn-outline" onclick="openMeetTimeLoc(${id}, '${purpose}', 'mc')">我来表白</button>
-                    <button class="btn btn-outline" onclick="openMeetTimeLoc(${id}, '${purpose}', 'npc')">${genderStr}来表白</button>
+        gameState.mapData.currentLoc = "教授办公室";
+        document.getElementById('map-main-view').style.display = 'none';
+        document.getElementById('map-location-view').style.display = 'block';
+        document.getElementById('loc-title').innerText = `📍 教授办公区`;
+        document.getElementById('loc-actions').innerHTML = '';
+        
+        let npcHtml = '';
+        gameState.mapData.professors.forEach(prof => {
+            let inOffice = Math.random() < 0.8;
+            let sub = getProfSubject(prof);
+            npcHtml += `<div style="border:1px solid var(--border-color); padding:5px 8px; margin-bottom:5px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:13px;">${prof} 教授 <span style="font-size:11px; color:#990000;">[${sub.n}]</span></div>
+                    <div style="font-size:11px; color:gray;">${inOffice ? '正在批改作业' : '门锁着'}</div>
                 </div>
-            `;
-            openModal("💖 表白企划", html);
-        } else {
-            openMeetTimeLoc(id, purpose, 'none');
-        }
+                <button class="btn btn-outline" style="width:auto; padding:2px 8px; margin:0; font-size:12px;" ${inOffice ? `onclick="meetProfessor('${prof}')"` : 'disabled'}>敲门</button>
+            </div>`;
+        });
+        document.getElementById('loc-npcs').innerHTML = npcHtml;
     };
 
-    window.openMeetTimeLoc = function(id, purpose, whoConfess) {
-        let md = gameState.mapData || { hours: 8, minutes: 0 };
-        let currentHour = md.hours;
-        let timeOptions = '';
-        for (let i = 12; i <= 17; i++) {
-            if (i > currentHour) timeOptions += `<option value="${i}">${i}:00</option>`;
-        }
-        if (timeOptions === '') {
-            alert("今天太晚了或时间不合适（只能约12:00-17:00，且需在当前时间之后），请明天再约吧！");
-            return;
-        }
-
-        let html = `
-            <div style="margin-bottom:8px; color:gray; font-size:12px;">约见目的：${purpose}</div>
-            <div style="margin-bottom:8px; color:gray; font-size:12px;">选择时间：</div>
-            <select id="meet-time" style="margin-bottom:15px; width:100%; display:block; padding:8px; border-radius:4px;">
-                ${timeOptions}
-            </select>
-            <div style="margin-bottom:8px; color:gray; font-size:12px;">选择地点：</div>
-            <select id="meet-loc" style="margin-bottom:20px; width:100%; display:block; padding:8px; border-radius:4px;">
-                <option value="有求必应屋">有求必应屋</option><option value="餐厅">餐厅</option>
-                <option value="走廊">走廊</option><option value="格兰芬多休息室">格兰芬多休息室</option>
-                <option value="斯莱特林休息室">斯莱特林休息室</option><option value="拉文克劳休息室">拉文克劳休息室</option>
-                <option value="赫奇帕奇休息室">赫奇帕奇休息室</option>
-            </select>
-            <button class="btn" style="background:var(--primary-color);" onclick="confirmMeet(${id}, '${purpose}', '${whoConfess}')">发送邀约</button>
-        `;
-        openModal("📅 约见时间与地点", html);
+    window.profTeach = function(profName) {
+        let n = gameState.npcs.find(x => x.name.includes(profName));
+        let rel = n ? n.relation : 30;
+        let sub = getProfSubject(profName);
+        let subject = sub.key; let subName = sub.n;
+        
+        if (!gameState.main.attributes) gameState.main.attributes = {};
+        if (!gameState.main.grades) gameState.main.grades = {};
+        
+        // 核心公式：属性随机加 1~3，并受好感加成
+        let attrIncrease = Math.max(1, Math.floor(Math.random() * 3) + Math.floor(rel / 30));
+        gameState.main.attributes[subject] = Math.min(100, (gameState.main.attributes[subject]||0) + attrIncrease);
+        
+        // 核心公式：成绩 = 30%的该科属性加成 + 70%的平时请教积累
+        let currentAttr = gameState.main.attributes[subject];
+        let baseGradeFromAttr = Math.floor(currentAttr * 0.3); 
+        let directGradeIncrease = Math.floor(Math.random() * 4) + Math.floor(rel / 20); 
+        
+        let oldGrade = gameState.main.grades[subject] || 0;
+        let newGrade = oldGrade + directGradeIncrease;
+        newGrade = Math.max(newGrade, baseGradeFromAttr + directGradeIncrease);
+        gameState.main.grades[subject] = Math.min(100, newGrade);
+        
+        updateUI();
+        alert(`🎓 你向 ${profName} 虚心请教了【${subName}】的疑难问题。\n\n教授耐心地解答了你的疑惑：\n✨ 魔法面板：【${subName}】属性 +${attrIncrease}\n📜 成绩面板：【${subName}】总评显著提升！`);
     };
 
-    window.confirmMeet = function(id, purpose, whoConfess) {
-        let time = parseInt(document.getElementById('meet-time').value);
-        let loc = document.getElementById('meet-loc').value;
-        const npc = gameState.npcs.find(n => n.id === id);
-        
-        if (!gameState.main.appointments) gameState.main.appointments = [];
-        gameState.main.appointments.push({ npcId: id, name: npc.name, purpose: purpose, whoConfess: whoConfess, time: time, loc: loc, day: gameState.mapData ? gameState.mapData.day : 1 });
-        
-        gameState.main.log = (gameState.main.log || "") + `\n[约见] 成功约见 ${npc.name} 在 ${time}:00 前往 ${loc}。事由：${purpose}`;
-        let fw = document.getElementById('floating-widget');
-        fw.style.display = 'flex'; fw.innerText = '⏰';
-        fw.onclick = () => alert(`你与 ${npc.name} 有个约定！\n地点：${loc}\n时间：${time}:00\n(对方会提前10分钟到，且最多等你10分钟)`);
-        
-        closeModal(); alert(`对方爽快地答应了！请务必按时赴约。`); updateUI();
+    // --- 4. 彻底修复：休息室口令跨天零点强刷机制 ---
+    const housePasswordsMap = {
+        "格兰芬多": ["龙渣", "猪鼻子", "仙子之光", "金狮咆哮", "勇气长存", "火灰蛇", "食肉企鹅", "吉罗德", "格兰芬多之剑", "赤胆忠心"],
+        "斯莱特林": ["纯血荣耀", "蛇怪之牙", "萨拉查的意志", "权力至上", "黑湖深渊", "狡诈之眼", "泥巴种走开", "马尔福赞助", "毒角兽", "荣耀与野心"],
+        "拉文克劳": ["智慧之冠", "鹰马之羽", "星空浩瀚", "真理无价", "思维敏捷", "罗伊纳的卷轴", "知识即力量", "无月之夜", "逻辑解谜", "静谧之思"],
+        "赫奇帕奇": ["忠诚如一", "獾之坚韧", "赫尔加的金杯", "黄油啤酒", "大地之子", "曼德拉草", "勤奋与耐心", "友谊长存", "厨房的秘密", "阳光普照"]
     };
-
-    const originalAddTime = window.addTime;
+    
     window.addTime = function(mins) {
-        if(originalAddTime) originalAddTime(mins);
+        if(window.originalAddTime) window.originalAddTime(mins);
         let md = gameState.mapData;
         if (!md || !gameState.main.appointments) return;
+        
         gameState.main.appointments = gameState.main.appointments.filter(app => {
+            // 核心修复：清理脏数据，防止莫名其妙因为假数据疯狂扣好感
+            if (!app.time || !app.day) return false; 
+            
             let isMissed = false;
             if (md.day > app.day) isMissed = true;
             else if (md.day === app.day) {
                 if (md.hours > app.time) isMissed = true;
-                if (md.hours === app.time && md.minutes > 10) isMissed = true;
+                // 核心修复：把宽容时间拉长到15分钟，防止边界判定误差乱扣好感
+                if (md.hours === app.time && md.minutes > 15) isMissed = true; 
             }
             if (isMissed) {
                 let npc = gameState.npcs.find(n => n.id === app.npcId);
-                if (npc) { npc.relation -= 30; alert(`🚨 糟糕！你错过了和 ${npc.name} 的约定！\n对方在 ${app.loc} 等了很久，非常生气！(好感-30)`); updateUI(); }
-                document.getElementById('floating-widget').style.display = 'none';
+                if (npc) { 
+                    npc.relation -= 30; 
+                    if(npc.relation < -100) npc.relation = -100;
+                    alert(`🚨 糟糕！你错过了和 ${npc.name} 的约定！\n对方在 ${app.loc} 等了很久，非常生气！(好感-30)`); 
+                    updateUI(); 
+                }
+                let fw = document.getElementById('floating-widget');
+                if(fw) fw.style.display = 'none';
                 return false; 
             }
             return true;
@@ -4187,81 +4201,97 @@ ${JSON.stringify(gameState.main)}
             let isValidTime = false;
             if (md.day === app.day) {
                 if (md.hours === app.time - 1 && md.minutes >= 50) isValidTime = true;
-                if (md.hours === app.time && md.minutes <= 10) isValidTime = true;
+                if (md.hours === app.time && md.minutes <= 15) isValidTime = true;
             }
             if (app.loc === locName && isValidTime) {
                 if (!md.locNpcs.find(n => n.id === app.npcId)) {
                     md.locNpcs.unshift({ id: app.npcId, name: app.name, isKnown: true, action: '早已在此等候多时，看起来有些紧张。', isDate: true, purpose: app.purpose, whoConfess: app.whoConfess });
-                    renderLocNpcs();
+                    if(typeof renderLocNpcs === "function") renderLocNpcs();
                 }
-                document.getElementById('floating-widget').style.display = 'none';
-                return false; 
+                let fw = document.getElementById('floating-widget');
+                if(fw) fw.style.display = 'none';
+                return false; // 赴约成功，从约定池剔除
             }
             return true;
         });
     };
 
-    const originalInteractNpc = window.interactNpc;
+    // 核心修复：恢复原版偷听、闲聊和结识系统，不仅限于约会
     window.interactNpc = function(npcId) {
         let n = gameState.mapData.locNpcs.find(x => x.id.toString() === npcId.toString());
-        if (n && n.isDate && n.purpose.includes("表白")) { 
-            openConfessInputDialogOffline(n.id, n.whoConfess); 
+        if (!n) return;
+        
+        // 优先判断是不是约会对象
+        if (n.isDate && n.purpose.includes("表白")) { 
+            window.startMeetConfess(n.id); 
             return; 
         }
-        if(originalInteractNpc) originalInteractNpc(npcId);
+        
+        let acts = `<button class="btn btn-outline" onclick="closeModal(); alert('你们闲聊了5分钟，聊了聊学校的八卦。'); if(typeof addTime === 'function') addTime(5);">💬 上前搭话 (5min)</button>`;
+        if (n.pairId) acts += `<button class="btn btn-outline" onclick="if(typeof eavesdropNpc === 'function') eavesdropNpc('${n.id}'); else { closeModal(); alert('偷听没听到什么实质内容。'); }">👂 偷听对话 (5min)</button>`;
+        if (!n.isKnown) acts += `<button class="btn" style="background:var(--primary-color);" onclick="knowMapNpc('${n.id}')">🤝 结识此人</button>`;
+        
+        openModal(`与 ${n.name} 交互`, `对方状态：${n.action}`, acts);
     };
 
-    // --- 赴约与线上告白执行系统 ---
+    // 核心修复：结识的人能正确识别学院并加入巫师通讯录
+    window.knowMapNpc = function(id) {
+        closeModal();
+        let n = gameState.mapData.locNpcs.find(x => x.id.toString() === id.toString());
+        if(!n) return;
+        n.isKnown = true;
+        let house = n.house || "未知学院";
+        let desc = `在地图探索时结识的${n.genderDesc || "同学"}。`;
+        gameState.npcs.push({ id: n.id, name: n.name, house: house, relation: 10, desc: desc, category: "校内" });
+        alert(`🤝 你与 ${n.name} 握了握手，互通了姓名。\n【已添加至巫师通讯录】`);
+        updateUI(); 
+        if(typeof renderLocNpcs === "function") renderLocNpcs();
+    };
+
     window.openConfessInputDialogOffline = function(id, who) {
         let title = who === 'mc' ? "你要对TA说什么？(描写告白场景)" : "你希望TA表现出怎样的告白走向？";
         let html = `<div style="font-size:12px; color:gray; margin-bottom:10px;">${title}</div>
             <textarea id="confess-input" rows="4" style="width:100%; border-radius:4px; padding:8px; border:1px solid var(--border-color);"></textarea>
             <button class="btn" style="background:#e91e63;" onclick="executeConfessAPIOffline(${id}, '${who}')">确定并等待</button>`;
-        openModal("✍️ 告白场景设定", html);
+        openModal("✍️ 告白内容设定", html);
     };
 
     let pendingEnvelopeData = null;
-
     window.executeConfessAPIOffline = async function(id, who) {
         let input = document.getElementById('confess-input').value.trim();
-        if(!input) { alert("多少写点什么吧！"); return; }
+        if(!input) { alert("写点什么吧！"); return; }
         const npc = gameState.npcs.find(n => n.id === id);
         let mcName = gameState.main.name || "我";
         
         let loadingText = who === 'mc' ? "你正在深呼吸，准备开口..." : "对方正在紧张地做准备...";
         document.getElementById('modalContent').innerHTML = `<div style="text-align:center; padding:20px;">${loadingText}</div>`;
-        
-        let fw = document.getElementById('floating-widget');
-        fw.style.display = 'none'; fw.onclick = null;
+        let fw = document.getElementById('floating-widget'); fw.style.display = 'none'; fw.onclick = null;
         
         let url = document.getElementById('apiUrl').value.replace(/\/$/, '');
         let key = document.getElementById('apiKey').value;
         let model = document.getElementById('apiModel').value;
         
         let promptStr = who === 'mc' 
-            ? `你是《哈利波特》中的【${npc.name}】。玩家（叫【${mcName}】）刚才当面向你表白了！玩家动作是：“${input}”。好感度满级。请用第一人称深情答应TA，包含动作语言。还要送玩家一个定情信物。禁止在文本中使用[玩家名字]占位符！
-必须严格返回合法JSON，不含Markdown格式：{"reply": "剧情描述", "gift": "礼物名称", "giftDesc": "礼物描述", "giftEffect": "礼物效果"}`
-            : `你是《哈利波特》中的【${npc.name}】。你现在当面向玩家（叫【${mcName}】）表白！玩家期待的走向是：“${input}”。请用第一人称深情表白，包含动作语言。还要送玩家一个定情信物。禁止在文本中使用[玩家名字]占位符！
-必须严格返回合法JSON，不含Markdown格式：{"reply": "剧情描述", "gift": "礼物名称", "giftDesc": "礼物描述", "giftEffect": "礼物效果"}`;
+            ? `你是《哈利波特》中的【${npc.name}】。玩家【${mcName}】当面向你表白了！玩家动作是：“${input}”。请用第一人称深情答应TA。顺带送玩家一个定情信物。禁止用[玩家名字]占位符！
+严格返回JSON：{"reply": "剧情描述", "gift": "礼物名称", "giftDesc": "礼物描述", "giftEffect": "礼物效果"}`
+            : `你是《哈利波特》中的【${npc.name}】。你现在当面向玩家【${mcName}】表白！玩家期待的走向是：“${input}”。请用第一人称深情表白。顺带送定情信物。禁止用[玩家名字]占位符！
+严格返回JSON：{"reply": "剧情描述", "gift": "礼物名称", "giftDesc": "礼物描述", "giftEffect": "礼物效果"}`;
 
         try {
             let res = await fetch(`${url}/v1/chat/completions`, { method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model, messages: [{ role: "user", content: promptStr }], temperature: 0.8 }) });
             let data = await res.json();
-            let replyText = data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-            let parsed = JSON.parse(replyText);
+            let parsed = JSON.parse(data.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim());
             
-            let finalText = parsed.reply.replace(/$$玩家名字$$|$$玩家名称$$|$$你的名字$$/g, mcName);
+            let finalText = parsed.reply.replace(/\[玩家名字\]|\[玩家名称\]|\[你的名字\]/g, mcName);
             npc.romanceState = 'dating'; 
-            
             if (parsed.gift) {
                 gameState.inventory.push({ id: Date.now(), name: parsed.gift, desc: parsed.giftDesc || "定情信物", effect: parsed.giftEffect || "[收藏品]", amount: 1 });
                 finalText += `<br><br><i>[获得了定情信物：${parsed.gift}]</i>`;
             }
             updateUI(); closeModal();
-            
             pendingEnvelopeData = { npcId: id, npcName: npc.name, text: finalText };
             fw.style.display = 'flex'; fw.innerText = '✉️'; fw.onclick = () => showEnvelope();
-        } catch(e) { closeModal(); alert("API出错了，告白飞丢了或返回格式不正确！"); }
+        } catch(e) { closeModal(); alert("API出错了！"); }
     };
 
     window.openConfessOnline = function(id) {
@@ -4276,19 +4306,14 @@ ${JSON.stringify(gameState.main)}
     };
 
     window.startOnlineConfessNPC = function(id) {
-        closeModal();
-        const npc = gameState.npcs.find(n => n.id === id);
+        closeModal(); const npc = gameState.npcs.find(n => n.id === id);
         if(!npc.chatHistory) npc.chatHistory = [];
         npc.chatHistory.push({role: 'system', text: '对方正在输入中...'});
-        openChat(id);
-        executeConfessAPIOnline(id, 'npc', '');
+        openChat(id); executeConfessAPIOnline(id, 'npc', '');
     };
-
     window.startOnlineConfessMC = function(id) {
-        closeModal();
-        const npc = gameState.npcs.find(n => n.id === id);
-        npc.isWaitingMcConfess = true;
-        openChat(id);
+        closeModal(); const npc = gameState.npcs.find(n => n.id === id);
+        npc.isWaitingMcConfess = true; openChat(id);
     };
 
     window.executeConfessAPIOnline = async function(id, who, mcInput) {
@@ -4299,25 +4324,21 @@ ${JSON.stringify(gameState.main)}
         let model = document.getElementById('apiModel').value;
 
         let promptStr = who === 'mc'
-            ? `你是《哈利波特》中的【${npc.name}】。玩家（叫【${mcName}】）正式写信向你表白了！内容是：“${mcInput}”。好感满级。请用第一人称写一封正式的回信答应TA。要求像写信一样有称谓和落款。警告：绝对不要在文本中使用“[玩家名字]”这种占位符，直接输出玩家名字！`
-            : `你是《哈利波特》中的【${npc.name}】。你现在要写信对玩家（叫【${mcName}】）进行正式表白！好感满级。请用第一人称写一封深情的告白信。要求有称谓和落款。警告：绝对不要在文本中使用“[玩家名字]”这种占位符，直接输出玩家名字！`;
+            ? `你是《哈利波特》中的【${npc.name}】。玩家【${mcName}】写信向你表白了！内容是：“${mcInput}”。好感满级。请用第一人称写一封正式的回信答应TA。要求像写信一样有称谓和落款。禁止用占位符！`
+            : `你是《哈利波特》中的【${npc.name}】。你要写信对玩家【${mcName}】进行正式表白！请用第一人称写一封深情的告白信。要求有称谓和落款。禁止用占位符！`;
 
         try {
             let res = await fetch(`${url}/v1/chat/completions`, { method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model, messages: [{ role: "user", content: promptStr }], temperature: 0.8 }) });
             let data = await res.json();
-            let replyText = data.choices[0].message.content.trim();
-            replyText = replyText.replace(/$$玩家名字$$|$$玩家名称$$|$$你的名字$$/g, mcName);
+            let replyText = data.choices[0].message.content.trim().replace(/\[玩家名字\]|\[玩家名称\]|\[你的名字\]/g, mcName);
 
             npc.romanceState = 'dating'; updateUI();
             npc.chatHistory = npc.chatHistory.filter(m => m.text !== '对方正在输入中...');
-            
-            let envId = Date.now();
-            npc.chatHistory.push({ type: 'envelope', envId: envId, text: replyText });
+            npc.chatHistory.push({ type: 'envelope', envId: Date.now(), text: replyText });
             openChat(id);
         } catch(e) {
             npc.chatHistory = npc.chatHistory.filter(m => m.text !== '对方正在输入中...');
-            npc.chatHistory.push({role: 'system', text: '信件发送失败(API错误)'});
-            openChat(id);
+            npc.chatHistory.push({role: 'system', text: '信件发送失败(API错误)'}); openChat(id);
         }
     };
 
@@ -4325,14 +4346,12 @@ ${JSON.stringify(gameState.main)}
         const npc = gameState.npcs.find(n => n.id === npcId);
         let envMsg = npc.chatHistory.find(m => m.envId === envId);
         if(!envMsg) return;
-        pendingEnvelopeData = { npcId: npcId, npcName: npc.name, text: envMsg.text };
-        showEnvelope();
+        pendingEnvelopeData = { npcId: npcId, npcName: npc.name, text: envMsg.text }; showEnvelope();
     };
 
     window.showEnvelope = function() {
         document.getElementById('floating-widget').style.display = 'none';
-        let overlay = document.getElementById('envelope-overlay');
-        overlay.style.display = 'flex';
+        document.getElementById('envelope-overlay').style.display = 'flex';
         document.getElementById('envelope-box').classList.remove('open');
         document.getElementById('envelope-paper').innerHTML = "";
     };
@@ -4341,36 +4360,775 @@ ${JSON.stringify(gameState.main)}
         let box = document.getElementById('envelope-box');
         if (box.classList.contains('open')) return;
         box.classList.add('open');
-        setTimeout(() => {
-            document.getElementById('envelope-paper').innerHTML = `<h3 style="text-align:center; color:#1a1a1a; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px; font-family:serif;">📜 ${pendingEnvelopeData.npcName} 的信</h3><p>${pendingEnvelopeData.text.replace(/\\n/g, '<br>')}</p>`;
-        }, 800);
+        setTimeout(() => { document.getElementById('envelope-paper').innerHTML = `<h3 style="text-align:center; color:#1a1a1a; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px; font-family:serif;">📜 ${pendingEnvelopeData.npcName} 的信</h3><p>${pendingEnvelopeData.text.replace(/\\n/g, '<br>')}</p>`; }, 800);
     };
 
     window.closeEnvelope = function() {
         if (!document.getElementById('envelope-box').classList.contains('open')) return;
         document.getElementById('envelope-overlay').style.display = 'none';
-        
         let itemName = `与 ${pendingEnvelopeData.npcName} 的告白书`;
         let exist = gameState.inventory.find(i => i.name === itemName && i.content === pendingEnvelopeData.text);
         if (!exist) {
-            gameState.inventory.push({ id: Date.now(), name: itemName, desc: "极其珍贵的收藏品。点击使用可反复观看。", effect: "[收藏品] 里面写满了浪漫的情话。", content: pendingEnvelopeData.text, amount: 1 });
-            alert(`这封珍贵的信件已存入背包-收藏品中！\n【已正式确立恋人关系！】`);
-            updateUI();
+            gameState.inventory.push({ id: Date.now(), name: itemName, desc: "极其珍贵的收藏品。点击可反复观看。", effect: "[收藏品] 里面写满了浪漫的情话。", content: pendingEnvelopeData.text, amount: 1 });
+            alert(`这封珍贵的信件已存入背包-收藏品中！\n【已正式确立恋人关系！】`); updateUI();
         }
     };
 
-    const originalUseItem = window.useItem;
     window.useItem = function(id) {
         const item = gameState.inventory.find(i => i.id == id);
         if (item && item.name.includes("告白书") && item.content) {
             pendingEnvelopeData = { npcName: item.name.replace("与 ", "").replace(" 的告白书", ""), text: item.content };
-            closeModal(); showEnvelope();
-            return;
+            closeModal(); showEnvelope(); return;
         }
-        if(originalUseItem) originalUseItem(id);
+        if(item && item.amount > 0) {
+            if (item.name.includes("画片") || item.name.includes("魔杖")) { alert("该物品不可直接使用！"); return; }
+            item.amount--; if(item.amount <= 0) gameState.inventory = gameState.inventory.filter(i => i.id != id);
+            let alertMsg = `使用了 ${item.name}！\n状态已更新：${item.effect}`;
+            applyEffectToStatus(item.effect); updateUI(); closeModal(); alert(alertMsg);
+        }
     };
     window.openFloatingEnvelope = function() { showEnvelope(); };
+    
+    // ========================================================== //
+    // ==== 新增设定：男生无法进入女生宿舍（滑梯惩罚机制） ==== //
+    // ========================================================== //
 
+    // 1. 覆写进入休息室的界面，拆分男女宿舍按钮
+    window.enterHouseDirectly = function(house) {
+        closeModal();
+        if(window.addTime) window.addTime(5);
+        gameState.mapData.currentLoc = house + "休息室";
+        
+        // 兼容生成NPC的函数调用
+        if(typeof generateLocNpcs === "function") {
+            gameState.mapData.locNpcs = generateLocNpcs();
+        } else {
+            gameState.mapData.locNpcs = [];
+        }
+        
+        document.getElementById('map-main-view').style.display = 'none';
+        document.getElementById('map-location-view').style.display = 'block';
+        document.getElementById('loc-title').innerText = `📍 ${house} 休息室`;
+        
+        if (!gameState.mapData.housePoints) {
+            gameState.mapData.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+        }
+        let pts = gameState.mapData.housePoints;
+        let dailyPwd = gameState.mapData.passwords[house] || "未知口令";
+
+        document.getElementById('loc-actions').innerHTML = `
+            <button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('消磨时间')">🛋️ 在沙发上休息 (1小时)</button>
+            <button class="btn btn-outline" style="width:auto; margin:0;" onclick="enterLocation('男生宿舍')">🛏️ 前往男生宿舍</button>
+            <button class="btn btn-outline" style="width:auto; margin:0;" onclick="enterLocation('女生宿舍')">🛏️ 前往女生宿舍</button>
+            
+            <div style="font-size:12px; color:var(--text-color); width:100%; margin-top:10px; padding:8px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; box-shadow:var(--shadow);">
+                <div style="font-weight:bold; margin-bottom:6px; text-align:center;">📌 学院杯布告栏</div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; padding:0 10px;">
+                    <span style="color:#990000; font-weight:bold;">🦁 格兰芬多: ${pts["格兰芬多"]} 分</span>
+                    <span style="color:#006622; font-weight:bold;">🐍 斯莱特林: ${pts["斯莱特林"]} 分</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; padding:0 10px;">
+                    <span style="color:#000099; font-weight:bold;">🦅 拉文克劳: ${pts["拉文克劳"]} 分</span>
+                    <span style="color:#CC9900; font-weight:bold;">🦡 赫奇帕奇: ${pts["赫奇帕奇"]} 分</span>
+                </div>
+                <div style="border-top:1px dashed var(--border-color); padding-top:6px; text-align:center;">
+                    今日进门口令：<span style="font-weight:bold; color:var(--primary-color);">${dailyPwd}</span>
+                </div>
+            </div>
+        `;
+        if(typeof renderLocNpcs === "function") renderLocNpcs();
+    };
+
+    // 2. 拦截并判定进入地点的指令
+    const prevEnterLocationForGender = window.enterLocation;
+    window.enterLocation = function(locName) {
+        if (locName === '女生宿舍') {
+            // 通过扫描主控档案的所有文本来判定是否为男（如果有"男"且不含"女"等关键词）
+            let mcText = (gameState.main.appearance || "") + (gameState.main.name || "") + (gameState.main.record || "") + JSON.stringify(gameState.main);
+            let isMale = false;
+            
+            if (/性别[:：]?\s*男/.test(mcText) || mcText.includes("男孩") || (mcText.includes("男") && !mcText.includes("女"))) {
+                isMale = true;
+            }
+            
+            if (isMale) {
+                alert("🚨 警告：你刚踏上女生宿舍的楼梯，脚下的台阶突然发出警报并瞬间融化，变成了一个长长且极度光滑的石头滑梯！你一屁股滑回了休息室大厅！\n\n(原著设定：男生无法进入女生宿舍，但女生可以去男生宿舍哦！)");
+                return; // 强行拦截，阻止进入
+            }
+        }
+        
+        // 判定通过或不是女生宿舍，则放行调用原本的进入逻辑（带出约会等功能）
+        if (prevEnterLocationForGender) {
+            prevEnterLocationForGender(locName);
+        }
+    };
+    // ========================================================== //
+    // ==== 紧急修复：重构并恢复所有地图探索原版功能与交互按钮 ==== //
+    // ========================================================== //
+
+    window.enterLocation = function(locName) {
+        // 1. 性别检测 (防进女生宿舍机制)
+        if (locName === '女生宿舍') {
+            let mcText = (gameState.main.appearance || "") + (gameState.main.name || "") + (gameState.main.record || "") + JSON.stringify(gameState.main);
+            let isMale = false;
+            // 扫描判断是否为男生
+            if (/性别[:：]?\s*男/.test(mcText) || mcText.includes("男孩") || (mcText.includes("男") && !mcText.includes("女"))) {
+                isMale = true;
+            }
+            if (isMale) {
+                alert("🚨 警告：你刚踏上女生宿舍的楼梯，脚下的台阶突然发出警报并瞬间融化，变成了一个长长且极度光滑的石头滑梯！你一屁股滑回了休息室大厅！\n\n(原著设定：男生无法进入女生宿舍)");
+                return; // 强行拦截
+            }
+        }
+
+        // 2. 原版核心拦截逻辑
+        if (typeof checkHogwartsAdmitted === 'function' && !checkHogwartsAdmitted()) return;
+        if (typeof patchMapData === 'function') patchMapData();
+        
+        // 特殊入口分发
+        if (locName === '校长办公室') { if(typeof enterHeadmaster === 'function') enterHeadmaster(); return; }
+        if (locName === '有求必应屋') { if(typeof enterROR === 'function') enterROR(); return; }
+
+        if (typeof addTime === 'function') addTime(5);
+        
+        // 3. 原版宵禁判定
+        let md = gameState.mapData;
+        if (md.hours >= 22 || md.hours < 6) {
+            if (Math.random() < 0.3) {
+                gameState.main.status.reputation = Math.max(0, (gameState.main.status.reputation || 50) - 5);
+                alert("🚨 糟糕！你在走廊游荡时被管理员费尔奇抓住了！\n【学院分-10，声望-5】");
+                if (typeof updateTraits === 'function') updateTraits();
+                return; // 被抓回，中断进入
+            }
+        }
+
+        md.currentLoc = locName;
+        
+        // 4. 原版：生成场景随机同学NPC
+        if (typeof generateLocNpcs === 'function') {
+            md.locNpcs = generateLocNpcs();
+        } else {
+            md.locNpcs = [];
+        }
+        
+        // 5. 原版：神秘的薇薇安 走廊概率刷新
+        if (locName === '走廊' && Math.random() < 0.4) {
+            md.locNpcs.push({
+                id: 'vivian', name: '神奇的薇薇安', isKnown: true, action: '鬼鬼祟祟地靠在墙角，大衣里似乎藏着许多瓶瓶罐罐'
+            });
+        }
+
+        // 6. 约见与赴约系统：插入赴约对象
+        if (gameState.main.appointments) {
+            gameState.main.appointments = gameState.main.appointments.filter(app => {
+                let isValidTime = false;
+                if (md.day === app.day) {
+                    // 提前10分钟到，推迟10分钟走
+                    if (md.hours === app.time - 1 && md.minutes >= 50) isValidTime = true;
+                    if (md.hours === app.time && md.minutes <= 10) isValidTime = true;
+                }
+                // 刚好在对的时间和对的地点
+                if (app.loc === locName && isValidTime) {
+                    if (!md.locNpcs.find(n => n.id === app.npcId)) {
+                        md.locNpcs.unshift({ id: app.npcId, name: app.name, isKnown: true, action: '早已在此等候多时，看起来有些紧张。', isDate: true, purpose: app.purpose, whoConfess: app.whoConfess });
+                    }
+                    let fw = document.getElementById('floating-widget');
+                    if(fw) fw.style.display = 'none';
+                    return false; // 成功赴约，从计划表剔除
+                }
+                return true;
+            });
+        }
+
+        // 7. 渲染 UI 与 原版专属操作按钮
+        document.getElementById('map-main-view').style.display = 'none';
+        document.getElementById('map-location-view').style.display = 'block';
+        document.getElementById('loc-title').innerText = `📍 ${locName}`;
+        
+        let actionHtml = '';
+        if (locName === '医疗翼') actionHtml += `<button class="btn btn-outline" style="width:auto; margin:0;" onclick="openMedicalCabinet()">💊 翻找药柜</button>`;
+        if (locName === '厨房') actionHtml += `<button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('吃东西')">🍗 找小精灵要吃的</button>`;
+        if (locName === '餐厅') {
+            if (md.hours >= 7 && md.hours <= 9 || md.hours >= 12 && md.hours <= 13 || md.hours >= 18 && md.hours <= 20) {
+                actionHtml += `<button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('用餐')">🍴 坐下用餐</button>`;
+            } else {
+                actionHtml += `<span style="font-size:12px; color:gray;">(非用餐时间，桌上空空如也)</span>`;
+            }
+        }
+        document.getElementById('loc-actions').innerHTML = actionHtml;
+        
+        if (typeof renderLocNpcs === 'function') renderLocNpcs();
+    };
+    
+        // ========================================================== //
+    // ==== 修复：地图时间停滞Bug & 新增薇薇安傲娇好感系统 ==== //
+    // ========================================================== //
+
+    // 1. 彻底重写 addTime 函数，确保地图左上角时间强制更新
+    const housePasswordsMapFix = {
+        "格兰芬多": ["龙渣", "猪鼻子", "仙子之光", "金狮咆哮", "勇气长存", "火灰蛇", "食肉企鹅", "吉罗德", "格兰芬多之剑", "赤胆忠心"],
+        "斯莱特林": ["纯血荣耀", "蛇怪之牙", "萨拉查的意志", "权力至上", "黑湖深渊", "狡诈之眼", "泥巴种走开", "马尔福赞助", "毒角兽", "荣耀与野心"],
+        "拉文克劳": ["智慧之冠", "鹰马之羽", "星空浩瀚", "真理无价", "思维敏捷", "罗伊纳的卷轴", "知识即力量", "无月之夜", "逻辑解谜", "静谧之思"],
+        "赫奇帕奇": ["忠诚如一", "獾之坚韧", "赫尔加的金杯", "黄油啤酒", "大地之子", "曼德拉草", "勤奋与耐心", "友谊长存", "厨房的秘密", "阳光普照"]
+    };
+
+    window.addTime = function(mins) {
+        let md = gameState.mapData;
+        if (!md) return;
+        
+        let oldDay = md.day;
+        md.minutes += mins;
+        if (md.minutes >= 60) { md.hours += Math.floor(md.minutes / 60); md.minutes %= 60; }
+        if (md.hours >= 24) { md.hours %= 24; md.day++; }
+        
+        if (md.day > oldDay) {
+            md.passwords = {
+                "格兰芬多": housePasswordsMapFix["格兰芬多"][Math.floor(Math.random()*10)],
+                "斯莱特林": housePasswordsMapFix["斯莱特林"][Math.floor(Math.random()*10)],
+                "拉文克劳": housePasswordsMapFix["拉文克劳"][Math.floor(Math.random()*10)],
+                "赫奇帕奇": housePasswordsMapFix["赫奇帕奇"][Math.floor(Math.random()*10)],
+                "校长": "柠檬雪糕"
+            };
+        }
+
+        // 处理约会爽约
+        if (gameState.main.appointments) {
+            gameState.main.appointments = gameState.main.appointments.filter(app => {
+                if (!app.time || !app.day) return false; 
+                let isMissed = false;
+                if (md.day > app.day) isMissed = true;
+                else if (md.day === app.day) {
+                    if (md.hours > app.time) isMissed = true;
+                    if (md.hours === app.time && md.minutes > 15) isMissed = true; 
+                }
+                if (isMissed) {
+                    let npc = gameState.npcs.find(n => n.id === app.npcId);
+                    if (npc) { 
+                        npc.relation -= 30; 
+                        if(npc.relation < -100) npc.relation = -100;
+                        alert(`🚨 糟糕！你错过了和 ${npc.name} 的约定！\n对方在 ${app.loc} 等了很久，非常生气！(好感-30)`); 
+                        updateUI(); 
+                    }
+                    let fw = document.getElementById('floating-widget');
+                    if(fw) fw.style.display = 'none';
+                    return false; 
+                }
+                return true;
+            });
+        }
+
+        // 强制更新左上角UI时间
+        let h = md.hours.toString().padStart(2, '0');
+        let m = md.minutes.toString().padStart(2, '0');
+        let timeEl = document.getElementById('map-time');
+        if (timeEl) timeEl.innerText = `${h}:${m}`;
+        
+        let statusEl = document.getElementById('curfew-status');
+        if (statusEl) {
+            if (md.hours >= 22 || md.hours < 6) {
+                statusEl.innerText = "🚨 宵禁中"; statusEl.style.color = "red";
+            } else {
+                statusEl.innerText = "未宵禁"; statusEl.style.color = "gray";
+            }
+        }
+        updateUI();
+    };
+
+    // 2. 薇薇安独立好感与动态价格系统
+    function getVivianMultiplier(relation) {
+        if (relation >= 100) return 0.85; // 打85折
+        if (relation < 0) return 1 + (Math.abs(relation) / 100); // 线性涨价，-100时变为2倍
+        return 1;
+    }
+
+    window.openVivianShop = function() {
+        let vData = gameState.mapData.vivian;
+        if (!vData.items || vData.items.length === 0) {
+            vData.items = window.initVivianItems();
+        }
+        // 初始化好感度
+        if (vData.relation === undefined) vData.relation = 0;
+
+        let multiplier = getVivianMultiplier(vData.relation);
+        let relText = `薇薇安好感：${Math.floor(vData.relation)}`;
+        if (vData.relation >= 100) relText += " (熟客 85折)";
+        else if (vData.relation < 0) relText += " (恶意涨价中)";
+
+        let currentMoneyStr = knutsToString(getMoneyInKnuts(gameState.main.assets));
+        let html = `
+            <div style="font-size:12px; color:gray; margin-bottom:10px; line-height:1.5;">
+                白金色的头发，海蓝色的眼睛。少女傲慢地抱起手臂，冷冷地瞥了你一眼：<br>
+                "嘘，需要点特别的东西吗？只收加隆... 哼，穷鬼可别浪费我时间。"
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border-color); padding-bottom:5px; margin-bottom:10px;">
+                <span style="color:#CC9900; font-weight:bold; font-size:13px;">当前余额: ${currentMoneyStr}</span>
+                <span style="font-size:11px; font-weight:bold; color:${vData.relation < 0 ? 'red' : (vData.relation >= 100 ? '#006622' : 'purple')}">${relText}</span>
+            </div>
+        `;
+        
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; max-height:50vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
+        
+        vData.items.forEach(item => {
+            let isSoldOut = item.stock <= 0;
+            // 根据好感度动态计算价格
+            let originalKnuts = getMoneyInKnuts(item.cost);
+            let adjustedKnuts = Math.floor(originalKnuts * multiplier);
+            let adjustedCostStr = knutsToString(adjustedKnuts);
+
+            let btnText = isSoldOut ? "已被扫空" : `交易 (${adjustedCostStr})`;
+            let btnStyle = isSoldOut ? "background-color: gray; color: white; border: none; cursor: not-allowed;" : "";
+            
+            html += `
+                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; opacity: ${isSoldOut ? '0.6' : '1'};">
+                    <div>
+                        <div style="font-weight:bold; font-size:13px; color: purple; display:flex; justify-content:space-between;">
+                            <span>${item.name}</span>
+                            <span style="font-size:11px; color:gray; font-weight:normal;">剩 ${item.stock}</span>
+                        </div>
+                        <div style="font-size:11px; color:gray; margin: 4px 0;">${item.desc}</div>
+                        <div style="font-size:11px; margin-bottom: 8px;">效果: ${item.effect}</div>
+                    </div>
+                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px; border-color:purple; color:purple; ${btnStyle}" 
+                            ${isSoldOut ? 'disabled' : `onclick="buyVivianItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')"`}>
+                        ${btnText}
+                    </button>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        let refreshBtn = '';
+        let lastTurn = vData.lastRefreshTurn === undefined ? -99 : vData.lastRefreshTurn;
+        if (gameState.turn - lastTurn >= 10) {
+            refreshBtn = `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0; color:purple; border-color:purple;" onclick="refreshVivianShop()">换一批黑货</button>`;
+        } else {
+            let wait = 10 - (gameState.turn - lastTurn);
+            refreshBtn = `<span style="font-size:12px; color:gray; margin-right:10px;">(等 ${wait} 周上新货)</span>`;
+        }
+
+        openModal(`🧙‍♀️ 神奇的薇薇安`, html, `${refreshBtn}<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="closeModal()">不买了</button>`);
+    };
+
+    window.buyVivianItem = function(itemName, originalCostStr, desc, effect) {
+        if (gameState.turn === 0) { alert("请先开启人生！"); return; }
+        let vData = gameState.mapData.vivian;
+        if (vData.relation === undefined) vData.relation = 0;
+
+        let itemObj = vData.items.find(i => i.name === itemName);
+        if (!itemObj || itemObj.stock <= 0) return;
+
+        let multiplier = getVivianMultiplier(vData.relation);
+        let originalKnuts = getMoneyInKnuts(originalCostStr);
+        let adjustedKnuts = Math.floor(originalKnuts * multiplier);
+        let adjustedCostStr = knutsToString(adjustedKnuts);
+
+        // 钱不够处理：毒舌 + 扣好感
+        if (!deductMoney(adjustedCostStr)) {
+            vData.relation -= 5;
+            if(vData.relation < -100) vData.relation = -100;
+            let insult = ["买不起就滚，别用你那双沾满泥巴的手碰我的货！", "连这点加隆都掏不出来，你在霍格沃茨是捡垃圾为生吗？", "嗤...穷酸味都飘到我鼻子底下了，快滚！", "没钱还敢来找我？去对角巷乞讨吧！"][Math.floor(Math.random()*4)];
+            alert(`薇薇安冷笑一声：“${insult}”\n\n(金钱不足：需要 ${adjustedCostStr})\n【薇薇安好感度 -5】`);
+            window.openVivianShop();
+            return;
+        }
+
+        // 购买成功：计算好感增加幅度 (根据原始价格动态分配 1~7)
+        itemObj.stock--;
+        let existingItem = gameState.inventory.find(i => i.name === itemName);
+        if (existingItem) existingItem.amount++;
+        else gameState.inventory.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: itemName, desc: desc, effect: effect, amount: 1 });
+        
+        let relIncrease = 1;
+        if (originalKnuts >= 49300) relIncrease = 7;      // 100加隆以上
+        else if (originalKnuts >= 24650) relIncrease = 5; // 50加隆以上
+        else if (originalKnuts >= 9860) relIncrease = 3;  // 20加隆以上
+
+        vData.relation += relIncrease;
+        if (vData.relation > 100) vData.relation = 100;
+
+        let compliment = ["算你识货，这可是不可多得的好东西。", "看在你还算大方的份上，下次可以再来找我。", "哼，花钱倒是不眨眼。收好，别让教授看见了。"][Math.floor(Math.random()*3)];
+        
+        updateUI();
+        window.openVivianShop();
+        alert(`交易成功！\n薇薇安迅速把 ${itemName} 塞进你的口袋：“${compliment}”\n\n消耗了 ${adjustedCostStr}\n【薇薇安好感度 +${relIncrease}】`);
+    };
+    // ========================================================== //
+    // ==== 修复：薇薇安商店入口丢失 & 多人同屏熟人刷新机制 ==== //
+    // ========================================================== //
+
+    // 1. 修复薇薇安交互丢失的问题，并保留约会和普通NPC系统
+    window.interactNpc = function(npcId) {
+        // 核心修复：薇薇安专属商店拦截
+        if (npcId === 'vivian' || npcId.toString() === 'vivian') {
+            if(typeof window.openVivianShop === 'function') window.openVivianShop();
+            return;
+        }
+
+        let n = gameState.mapData.locNpcs.find(x => x.id.toString() === npcId.toString());
+        if (!n) return;
+        
+        // 约会拦截
+        if (n.isDate && n.purpose && n.purpose.includes("表白")) { 
+            if(typeof window.startMeetConfess === 'function') window.startMeetConfess(n.id); 
+            return; 
+        }
+        
+        // 正常NPC交互面板
+        let acts = `<button class="btn btn-outline" onclick="closeModal(); alert('你们闲聊了5分钟，聊了聊学校的八卦。'); if(typeof window.addTime === 'function') window.addTime(5);">💬 上前搭话 (5min)</button>`;
+        if (n.pairId) acts += `<button class="btn btn-outline" onclick="if(typeof window.eavesdropNpc === 'function') window.eavesdropNpc('${n.id}'); else { closeModal(); alert('偷听没听到什么实质内容。'); }">👂 偷听对话 (5min)</button>`;
+        if (!n.isKnown) acts += `<button class="btn" style="background:var(--primary-color);" onclick="if(typeof window.knowMapNpc === 'function') window.knowMapNpc('${n.id}');">🤝 结识此人</button>`;
+        
+        openModal(`与 ${n.name} 交互`, `对方状态：${n.action}`, acts);
+    };
+
+    // 2. 修复单地图只刷1个熟人的问题，改为 0~3个 随机不重复
+    window.generateLocNpcs = function() {
+        let npcs = [];
+        let count = Math.floor(Math.random() * 4) + 4; // 场景总人数 4~7
+        
+        let loc = gameState.mapData.currentLoc || "";
+        let houseFilter = null;
+        if (loc.includes("格兰芬多")) houseFilter = "格兰芬多";
+        else if (loc.includes("斯莱特林")) houseFilter = "斯莱特林";
+        else if (loc.includes("拉文克劳")) houseFilter = "拉文克劳";
+        else if (loc.includes("赫奇帕奇")) houseFilter = "赫奇帕奇";
+
+        let actions = [
+            "正在翻阅一本厚厚的魔法书", "正在小声练习魔杖手势", "匆匆忙忙地赶路，像要迟到了", 
+            "似乎在寻找丢失的羽毛笔", "靠在墙上闭目养神", "盯着窗外的景色若有所思", 
+            "正在整理弄皱的校袍", "手里拿着羊皮纸写写画画", "正在吃一颗比比多味豆，表情很怪",
+            "正在仔细观察周围的画像", "百无聊赖地打了个大哈欠"
+        ];
+
+        // 筛选符合学院条件的已知同学
+        let known = gameState.npcs.filter(n => n.category === "校内" && (!houseFilter || n.house === houseFilter));
+        
+        // 核心修复：决定刷出 0~3 个熟人
+        let numKnown = Math.floor(Math.random() * 4); // 0, 1, 2, 3
+        if (numKnown > known.length) numKnown = known.length;
+        
+        // 将熟人打乱并抽取前 numKnown 个
+        let shuffledKnown = [...known].sort(() => 0.5 - Math.random()).slice(0, numKnown);
+        
+        // 把抽取出的熟人压入场景
+        shuffledKnown.forEach(k => {
+            npcs.push({ 
+                id: k.id, 
+                name: k.name, 
+                isKnown: true, 
+                action: actions[Math.floor(Math.random() * actions.length)], 
+                house: k.house,
+                genderDesc: (k.desc && k.desc.includes("女")) ? "女同学" : "男同学"
+            });
+        });
+
+        // 剩下的名额用路人填满
+        for (let i = npcs.length; i < count; i++) {
+            let isMale = Math.random() > 0.5;
+            if (loc === "女生宿舍") isMale = false; 
+
+            let f = isMale ? firstNamesM[Math.floor(Math.random()*firstNamesM.length)] : firstNamesF[Math.floor(Math.random()*firstNamesF.length)];
+            let l = lastNames[Math.floor(Math.random()*lastNames.length)];
+            let npcHouse = houseFilter ? houseFilter : ["格兰芬多", "斯莱特林", "拉文克劳", "赫奇帕奇"][Math.floor(Math.random() * 4)];
+
+            npcs.push({
+                id: Date.now() + i + Math.floor(Math.random()*10000), 
+                name: `${f}·${l}`,
+                isKnown: false,
+                action: actions[Math.floor(Math.random() * actions.length)],
+                house: npcHouse,
+                genderDesc: isMale ? "男同学" : "女同学"
+            });
+        }
+
+        // 配对交谈降低概率，只取场景最后生成的两个人
+        if (npcs.length >= 2 && Math.random() < 0.3) {
+            let idx1 = npcs.length - 1;
+            let idx2 = npcs.length - 2;
+            npcs[idx1].action = `正在和 ${npcs[idx2].name} 悄悄讨论着什么`;
+            npcs[idx2].action = `正在和 ${npcs[idx1].name} 悄悄讨论着什么`;
+            npcs[idx1].pairId = npcs[idx2].id;
+            npcs[idx2].pairId = npcs[idx1].id;
+        }
+
+        return npcs;
+    };    
+
+    // ========================================================== //
+    // ==== 修复：学院分动态自然增长与剧情AI加扣分解析补丁 ==== //
+    // ========================================================== //
+
+    // 1. 拦截 addTime，实现跨天时四个学院分数的自然增长与波动
+    const prevAddTimeForHousePoints = window.addTime;
+    window.addTime = function(mins) {
+        let md = gameState.mapData;
+        let oldDay = md ? md.day : 1;
+        
+        // 调用原有的时间流动与约会检测逻辑
+        if (prevAddTimeForHousePoints) prevAddTimeForHousePoints(mins);
+        
+        // 跨天后，处理学院分动态变化
+        if (md && md.day > oldDay) {
+            if (!md.housePoints) md.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+            for(let h in md.housePoints) {
+                // 每天每个学院自然产生变动，加分多于扣分，符合学期累计趋势 (例如: -5 到 +15 分)
+                let change = Math.floor(Math.random() * 21) - 5; 
+                md.housePoints[h] = Math.max(0, md.housePoints[h] + change);
+            }
+        }
+    };
+
+    // 2. 拦截 updateUI，在生成完剧情后，用正则智能提取文本中的加/扣分并落实到底层数据
+    const prevUpdateUIForHousePoints = window.updateUI;
+    window.updateUI = function() {
+        let md = gameState.mapData;
+        if (md && !md.housePoints) {
+            md.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+        }
+        
+        if (md && gameState.story && gameState.story.text) {
+            let storyText = gameState.story.text;
+            
+            // 为了防止同一段剧情被重复解析多次扣分，打上唯一解析标记
+            if (gameState.story._parsedHousePoints !== storyText) {
+                gameState.story._parsedHousePoints = storyText;
+                
+                // 智能寻找主控所属学院
+                let mcText = (gameState.main.record||"") + (gameState.main.special||"") + (gameState.main.family||"") + (gameState.main.appearance||"");
+                let mcHouse = ["格兰芬多", "斯莱特林", "拉文克劳", "赫奇帕奇"].find(h => mcText.includes(h)) || "格兰芬多";
+                
+                let match;
+                // 匹配格式 1，例如：学院分+10, 学院分 -5
+                let regexGeneral = /学院分?\s*([+-])\s*(\d+)/g;
+                while ((match = regexGeneral.exec(storyText)) !== null) {
+                    let sign = match[1] === '+' ? 1 : -1;
+                    let val = parseInt(match[2]);
+                    md.housePoints[mcHouse] = Math.max(0, md.housePoints[mcHouse] + (sign * val));
+                }
+                
+                // 匹配格式 2，例如：格兰芬多+10, 斯莱特林 -5
+                let regexSpecific = /(格兰芬多|斯莱特林|拉文克劳|赫奇帕奇)[\s分]*([+-])\s*(\d+)/g;
+                while ((match = regexSpecific.exec(storyText)) !== null) {
+                    let house = match[1];
+                    let sign = match[2] === '+' ? 1 : -1;
+                    let val = parseInt(match[3]);
+                    md.housePoints[house] = Math.max(0, md.housePoints[house] + (sign * val));
+                }
+
+                // 匹配格式 3 (原著汉字常态)，例如：格兰芬多扣10分，加20分
+                let regexWord = /(格兰芬多|斯莱特林|拉文克劳|赫奇帕奇)?(?:学院)?\s*(加|扣|减去)\s*(\d+)\s*分/g;
+                while ((match = regexWord.exec(storyText)) !== null) {
+                    let house = match[1] || mcHouse;
+                    let sign = match[2] === '加' ? 1 : -1;
+                    let val = parseInt(match[3]);
+                    md.housePoints[house] = Math.max(0, md.housePoints[house] + (sign * val));
+                }
+            }
+        }
+        
+        // 继续执行原有的 UI 渲染 (布告栏的分数此时已经更新了)
+        if (prevUpdateUIForHousePoints) prevUpdateUIForHousePoints();
+    };
+    
+    // ========================================================== //
+    // ==== 修复：全场景真实扣分联动 & 教师活动轨迹屏蔽补丁 ==== //
+    // ========================================================== //
+
+    // 辅助函数：智能获取主控所属学院
+    function getMcHouse() {
+        let mcText = (gameState.main.record||"") + (gameState.main.special||"") + (gameState.main.family||"") + (gameState.main.appearance||"");
+        return ["格兰芬多", "斯莱特林", "拉文克劳", "赫奇帕奇"].find(h => mcText.includes(h)) || "格兰芬多";
+    }
+
+    // 1. 拦截 addTime，在平时消耗时间时让学院分真实产生微小浮动
+    const prevAddTimeForDailyPoints = window.addTime;
+    window.addTime = function(mins) {
+        if (prevAddTimeForDailyPoints) prevAddTimeForDailyPoints(mins);
+        
+        let md = gameState.mapData;
+        if (md && md.housePoints) {
+            // 每度过一次时间(移动、搭话)，都有 25% 的概率随机增减某学院的分数
+            if (Math.random() < 0.25) {
+                let houses = ["格兰芬多", "斯莱特林", "拉文克劳", "赫奇帕奇"];
+                let target = houses[Math.floor(Math.random() * houses.length)];
+                let change = Math.floor(Math.random() * 3) - 1; // -1 到 +1 之间微调
+                md.housePoints[target] = Math.max(0, md.housePoints[target] + change);
+            }
+        }
+    };
+
+    // 2. 全量重写 enterLocation，实现费尔奇“真实扣分”及所有交互大一统
+    window.enterLocation = function(locName) {
+        if (locName === '女生宿舍') {
+            let mcText = (gameState.main.appearance || "") + (gameState.main.name || "") + (gameState.main.record || "") + JSON.stringify(gameState.main);
+            if (/性别[:：]?\s*男/.test(mcText) || mcText.includes("男孩") || (mcText.includes("男") && !mcText.includes("女"))) {
+                alert("🚨 警告：你刚踏上女生宿舍的楼梯，脚下的台阶突然发出警报并瞬间融化，变成了一个长长且极度光滑的石头滑梯！你一屁股滑回了休息室大厅！\n\n(原著设定：男生无法进入女生宿舍)");
+                return;
+            }
+        }
+        if (typeof checkHogwartsAdmitted === 'function' && !checkHogwartsAdmitted()) return;
+        if (typeof patchMapData === 'function') patchMapData();
+        if (locName === '校长办公室') { if(typeof enterHeadmaster === 'function') enterHeadmaster(); return; }
+        if (locName === '有求必应屋') { if(typeof enterROR === 'function') enterROR(); return; }
+        if (typeof addTime === 'function') addTime(5);
+        
+        let md = gameState.mapData;
+        
+        // 【核心修复】：费尔奇不仅弹窗，还会真实扣分
+        if (md.hours >= 22 || md.hours < 6) {
+            if (Math.random() < 0.3) {
+                gameState.main.status.reputation = Math.max(0, (gameState.main.status.reputation || 50) - 5);
+                let mcHouse = getMcHouse();
+                if(!md.housePoints) md.housePoints = { "格兰芬多": 250, "斯莱特林": 250, "拉文克劳": 250, "赫奇帕奇": 250 };
+                md.housePoints[mcHouse] = Math.max(0, md.housePoints[mcHouse] - 10);
+
+                alert(`🚨 糟糕！你在走廊游荡时被管理员费尔奇抓住了！\n【${mcHouse} 扣 10 分，声望 -5】`);
+                if (typeof updateTraits === 'function') updateTraits();
+                return; 
+            }
+        }
+
+        md.currentLoc = locName;
+        md.locNpcs = typeof window.generateLocNpcs === 'function' ? window.generateLocNpcs() : [];
+        if (locName === '走廊' && Math.random() < 0.4) {
+            md.locNpcs.push({ id: 'vivian', name: '神奇的薇薇安', isKnown: true, action: '鬼鬼祟祟地靠在墙角，大衣里似乎藏着许多瓶瓶罐罐' });
+        }
+
+        if (gameState.main.appointments) {
+            gameState.main.appointments = gameState.main.appointments.filter(app => {
+                let isValidTime = false;
+                if (md.day === app.day) {
+                    if (md.hours === app.time - 1 && md.minutes >= 50) isValidTime = true;
+                    if (md.hours === app.time && md.minutes <= 15) isValidTime = true;
+                }
+                if (app.loc === locName && isValidTime) {
+                    if (!md.locNpcs.find(n => n.id === app.npcId)) {
+                        md.locNpcs.unshift({ id: app.npcId, name: app.name, isKnown: true, action: '早已在此等候多时，看起来有些紧张。', isDate: true, purpose: app.purpose, whoConfess: app.whoConfess });
+                    }
+                    let fw = document.getElementById('floating-widget');
+                    if(fw) fw.style.display = 'none';
+                    return false; 
+                }
+                return true;
+            });
+        }
+
+        document.getElementById('map-main-view').style.display = 'none';
+        document.getElementById('map-location-view').style.display = 'block';
+        document.getElementById('loc-title').innerText = `📍 ${locName}`;
+        let actionHtml = '';
+        if (locName === '医疗翼') actionHtml += `<button class="btn btn-outline" style="width:auto; margin:0;" onclick="openMedicalCabinet()">💊 翻找药柜</button>`;
+        if (locName === '厨房') actionHtml += `<button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('吃东西')">🍗 找小精灵要吃的</button>`;
+        if (locName === '餐厅') {
+            if (md.hours >= 7 && md.hours <= 9 || md.hours >= 12 && md.hours <= 13 || md.hours >= 18 && md.hours <= 20) {
+                actionHtml += `<button class="btn btn-outline" style="width:auto; margin:0;" onclick="interactLoc('用餐')">🍴 坐下用餐</button>`;
+            } else { actionHtml += `<span style="font-size:12px; color:gray;">(非用餐时间，桌上空空如也)</span>`; }
+        }
+        document.getElementById('loc-actions').innerHTML = actionHtml;
+        if (typeof renderLocNpcs === 'function') renderLocNpcs();
+    };
+
+    // 3. 全量重写 generateLocNpcs，增加【教师刷新地点屏蔽限制】
+    window.generateLocNpcs = function() {
+        let npcs = [];
+        let count = Math.floor(Math.random() * 4) + 4; 
+        
+        let loc = gameState.mapData.currentLoc || "";
+        let houseFilter = null;
+        if (loc.includes("格兰芬多")) houseFilter = "格兰芬多";
+        else if (loc.includes("斯莱特林")) houseFilter = "斯莱特林";
+        else if (loc.includes("拉文克劳")) houseFilter = "拉文克劳";
+        else if (loc.includes("赫奇帕奇")) houseFilter = "赫奇帕奇";
+
+        let actions = [
+            "正在翻阅一本厚厚的魔法书", "正在小声练习魔杖手势", "匆匆忙忙地赶路，像要迟到了", 
+            "似乎在寻找丢失的羽毛笔", "靠在墙上闭目养神", "盯着窗外的景色若有所思", 
+            "正在整理弄皱的校袍", "手里拿着羊皮纸写写画画", "正在吃一颗比比多味豆，表情很怪",
+            "正在仔细观察周围的画像", "百无聊赖地打了个大哈欠"
+        ];
+
+        // 【核心修复】：特定地点屏蔽教师/教授刷新
+        const teacherBannedLocs = ["医疗翼", "走廊", "厨房", "餐厅"];
+        let isTeacherBanned = teacherBannedLocs.includes(loc);
+
+        let known = gameState.npcs.filter(n => {
+            if (n.category !== "校内") return false;
+            if (houseFilter && n.house !== houseFilter) return false;
+            // 屏蔽教师判定
+            if (isTeacherBanned) {
+                let descStr = (n.desc || "") + (n.house || "");
+                if (descStr.includes("教授") || descStr.includes("老师") || descStr.includes("校长") || descStr.includes("教职工") || descStr.includes("管理员")) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        
+        let numKnown = Math.floor(Math.random() * 4); 
+        if (numKnown > known.length) numKnown = known.length;
+        let shuffledKnown = [...known].sort(() => 0.5 - Math.random()).slice(0, numKnown);
+        
+        shuffledKnown.forEach(k => {
+            npcs.push({ 
+                id: k.id, 
+                name: k.name, 
+                isKnown: true, 
+                action: actions[Math.floor(Math.random() * actions.length)], 
+                house: k.house,
+                genderDesc: (k.desc && k.desc.includes("女")) ? "女同学" : "男同学"
+            });
+        });
+
+        for (let i = npcs.length; i < count; i++) {
+            let isMale = Math.random() > 0.5;
+            if (loc === "女生宿舍") isMale = false; 
+            let f = isMale ? firstNamesM[Math.floor(Math.random()*firstNamesM.length)] : firstNamesF[Math.floor(Math.random()*firstNamesF.length)];
+            let l = lastNames[Math.floor(Math.random()*lastNames.length)];
+            let npcHouse = houseFilter ? houseFilter : ["格兰芬多", "斯莱特林", "拉文克劳", "赫奇帕奇"][Math.floor(Math.random() * 4)];
+
+            npcs.push({
+                id: Date.now() + i + Math.floor(Math.random()*10000), 
+                name: `${f}·${l}`,
+                isKnown: false,
+                action: actions[Math.floor(Math.random() * actions.length)],
+                house: npcHouse,
+                genderDesc: isMale ? "男同学" : "女同学"
+            });
+        }
+
+        if (npcs.length >= 2 && Math.random() < 0.3) {
+            let idx1 = npcs.length - 1;
+            let idx2 = npcs.length - 2;
+            npcs[idx1].action = `正在和 ${npcs[idx2].name} 悄悄讨论着什么`;
+            npcs[idx2].action = `正在和 ${npcs[idx1].name} 悄悄讨论着什么`;
+            npcs[idx1].pairId = npcs[idx2].id;
+            npcs[idx2].pairId = npcs[idx1].id;
+        }
+
+        return npcs;
+    };    
+
+    // ========================================================== //
+    // ==== 新增：宵禁时间(22:00-06:00)地图停止刷新NPC补丁 ==== //
+    // ========================================================== //
+
+    const prevGenerateLocNpcsForCurfew = window.generateLocNpcs;
+    window.generateLocNpcs = function() {
+        let md = gameState.mapData;
+        
+        // 核心拦截：判断当前是否处于宵禁时间
+        if (md && (md.hours >= 22 || md.hours < 6)) {
+            // 宵禁时间，大家都在睡觉，地图上空无一人（返回空数组）
+            // 此时只有薇薇安(走廊黑市)和你的深夜约会对象能越过此限制被强行刷出
+            return [];
+        }
+        
+        // 如果不是宵禁时间，则执行原有正常的刷新逻辑
+        if (prevGenerateLocNpcsForCurfew) {
+            return prevGenerateLocNpcsForCurfew();
+        }
+        return [];
+    };
 </script>
 </body>
-    </html>
+        </html>
