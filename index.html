@@ -274,11 +274,11 @@
         .social-category-content { display: none; }
         .social-category-content.open { display: block; }
         
-        .chat-box { height: 300px; overflow-y: auto; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
-        .chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-all; }
+        .chat-box { height: 260px; overflow-y: auto; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+        .chat-msg { max-width: 85%; padding: 6px 10px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-all; }
         .chat-msg.user { align-self: flex-end; background: var(--primary-color); color: white; border-bottom-right-radius: 2px; }
         .chat-msg.npc { align-self: flex-start; background: #e9ecef; color: black; border-bottom-left-radius: 2px; }
-        .chat-msg.system { align-self: center; background: transparent; color: gray; font-size: 11px; text-align: center; }
+        .chat-msg.system { align-self: center; background: transparent; color: gray; font-size: 11px; text-align: center; margin-bottom: 2px; }
         .chat-redpack { background: #fce8e6; border: 1px solid #f28b82; color: #d93025; padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 10px; margin-top: 5px; align-self: flex-start; max-width: 85%;}
         .chat-redpack-icon { font-size: 24px; }
         
@@ -1153,6 +1153,7 @@ c.多人交互对话
 
     // 状态词条库
     const traitsDB = {
+        "纳西塞斯": { type: "debuff", desc: "因误饮迷情剂导致极度自恋，随时随地都要照镜子欣赏自己。持续10周自动消退。" },
         "体力不支": { type: "debuff", desc: "体力少于10点。你饿得头晕眼花，连举起魔杖的力气都没有了。无法进行任何行动，快去吃东西！" },
         "极度疲劳": { type: "debuff", desc: "体力少于20点。双腿像灌了铅，有概率在行动中晕倒。" },
         "精力旺盛": { type: "buff", desc: "体力高于80点。感觉有用不完的力气，行动效率极高。" },
@@ -1183,6 +1184,8 @@ c.多人交互对话
         let s = gameState.main.status;
         if (!s) return;
         let t = new Set(gameState.main.traits || []);
+        
+        if(gameState.main.narcissusTurn && gameState.main.narcissusTurn > gameState.turn) t.add("纳西塞斯"); else t.delete("纳西塞斯");
         
         if(s.stamina < 10) t.add("体力不支"); else t.delete("体力不支");
         if(s.stamina < 20 && s.stamina >= 10) t.add("极度疲劳"); else t.delete("极度疲劳");
@@ -1920,12 +1923,23 @@ c.多人交互对话
             showNPC(npcId); return;
         }
 
+        let extraPrompt = "如果是奇奇怪怪的东西（比如大粪弹），你可能会生气。";
+        if (item.name === "迷情剂") {
+            npc.relation = Math.min(100, npc.relation + 50);
+            npc.lovePotionTurn = gameState.turn + 10;
+            extraPrompt = "【极其重要】这是一瓶迷情剂！你喝下后立刻无可救药地爱上了玩家，表现出病态的极度痴迷和狂热的单相思爱意！你绝对会非常喜欢这份礼物！";
+        } else if (item.name.includes("后悔药")) {
+            npc.romanceState = null; // 重置拒绝状态
+            extraPrompt = "【极其重要】这是后悔药，你喝下后忘掉了之前拒绝玩家的芥蒂和尴尬，对玩家态度恢复正常并感谢这份礼物。";
+        }
+
         const promptStr = `你扮演《哈利波特》中的【${npc.name}】。你的身份：${npc.desc}。
 玩家送给你一件礼物：【${item.name}】(描述：${item.desc})。
-请根据你的人设判断你是否喜欢这个礼物。如果是奇奇怪怪的东西（比如别人用过的魔杖、大粪弹等），你可能会觉得奇怪甚至生气。
+请根据你的人设判断你是否喜欢这个礼物。${extraPrompt}
 返回JSON格式：{"relationChange": 好感度变化数值(整数，可正可负可为0), "reply": "你收到礼物后的反应/回信"}`;
-
-        try {
+        
+				
+				try {
             const response = await fetch(`${url}/v1/chat/completions`, {
                 method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: model, messages: [{ role: "user", content: promptStr }], temperature: 0.7 })
@@ -3426,34 +3440,34 @@ ${JSON.stringify(gameState.main)}
         }
         if(!n.chatHistory) n.chatHistory = [];
         
-        let chatHtml = `<div id="prof-chat-box" style="height:150px; overflow-y:auto; font-size:12px; margin-bottom:10px; background:var(--bg-color); padding:8px; border-radius:4px; border:1px inset var(--border-color);">`;
+        let chatHtml = `<div id="prof-chat-box" style="height:120px; overflow-y:auto; font-size:12px; margin-bottom:4px; background:var(--bg-color); padding:4px; border-radius:4px; border:1px inset var(--border-color);">`;
         if (n.chatHistory.length === 0) chatHtml += `<div style="color:gray; text-align:center;">暂无聊天记录，向教授打个招呼吧。</div>`;
         n.chatHistory.forEach(msg => {
             let align = msg.role === 'user' ? 'right' : 'left';
             let color = msg.role === 'user' ? 'var(--primary-color)' : 'black';
-            chatHtml += `<div style="margin-bottom:6px; text-align:${align}; color:${color};">${msg.text}</div>`;
+            chatHtml += `<div style="margin-bottom:4px; text-align:${align}; color:${color};">${msg.text}</div>`;
         });
         chatHtml += `</div>`;
 
-        // 三年级特殊任务：麦格教授提交同意书
         let mcgonagallQuest = "";
         if (profName.includes("麦格") && parseInt(gameState.main.age) >= 13 && !gameState.mapData.hogsmeadeUnlocked) {
-            mcgonagallQuest = `<button class="btn" style="width:100%; margin-bottom:8px; padding:6px; background-color:#CC9900; color:black; border:none;" onclick="submitPermissionForm()">📝 提交霍格莫德同意书</button>`;
+            mcgonagallQuest = `<button class="btn" style="width:100%; margin-bottom:4px; padding:4px; font-size:12px; background-color:#CC9900; color:black; border:none;" onclick="submitPermissionForm()">📝 提交霍格莫德同意书</button>`;
         }
 
         let html = `
-            <div style="font-size:12px; color:gray; margin-bottom:8px; text-align:center;">你推门进入了 ${profName} 的办公室，教授抬头看了你一眼。</div>
+            <div style="text-align:center; margin-bottom:6px;">
+                <span style="font-size:12px; color:gray; background:rgba(0,0,0,0.05); padding:4px 8px; border-radius:6px; display:inline-block;">你推门进入办公室，${profName} 抬头看了你一眼。</span>
+            </div>
             ${mcgonagallQuest}
-            
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                    <span style="font-weight:bold; font-size:13px; color:var(--primary-color);">💬 互动与闲聊</span>
-                    <button class="btn btn-outline" style="width:auto; margin:0; padding:2px 8px; font-size:11px;" onclick="profTeach('${profName}')">📖 学术请教 (+属性)</button>
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-weight:bold; font-size:12px; color:var(--primary-color);">💬 互动与闲聊</span>
+                    <button class="btn btn-outline" style="width:auto; margin:0; padding:2px 6px; font-size:11px;" onclick="profTeach('${profName}')">📖 学术请教</button>
                 </div>
                 ${chatHtml}
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <input type="text" id="prof-chat-input" placeholder="和教授说点什么..." style="flex:1; margin:0; padding:4px 6px; border-radius:4px; font-size:12px;">
-                    <button class="btn" style="width:auto; margin:0; padding:4px 12px; font-size:12px;" onclick="profChat('${profName}')">发送</button>
+                <div style="display:flex; gap:4px; margin-top:4px;">
+                    <input type="text" id="prof-chat-input" placeholder="和教授说点什么..." style="flex:1; margin:0; padding:4px; border-radius:4px; font-size:12px;">
+                    <button class="btn" style="width:auto; margin:0; padding:4px 10px; font-size:12px;" onclick="profChat('${profName}')">发送</button>
                 </div>
             </div>
         `;
@@ -3664,51 +3678,62 @@ ${JSON.stringify(gameState.main)}
     }
 
     // --- 薇薇安特殊黑市商店 ---
-    function initVivianItems() {
+    window.initVivianItems = function() {
         return [
-            { name: "迷情剂", cost: "30 金加隆", desc: "散发着珍珠母光泽，极其危险的爱情魔药。", effect: "极大幅度增加好感", stock: 1 },
+            { name: "迷情剂", cost: "30 金加隆", desc: "极其危险的爱情魔药。", effect: "自己喝[纳西塞斯]，送人[好感+50且痴迷10周]", stock: 1 },
+            { name: "后悔药(感情重置)", cost: "100 金加隆", desc: "时光倒流一瞬，洗去对方因拒绝而产生的芥蒂。", effect: "赠送给拒绝过你的NPC，可重置恋爱状态", stock: 1 },
             { name: "生死水", cost: "25 金加隆", desc: "强效安眠药，喝下后如同死一般沉睡。", effect: "体力+50, 健康-10", stock: 1 },
             { name: "吐真剂", cost: "50 金加隆", desc: "无色无味，三滴即可让人吐露最深藏的秘密。", effect: "审问特殊道具", stock: 1 },
             { name: "福灵剂", cost: "100 金加隆", desc: "液态的好运，稀有至极。", effect: "全属性+50，心情直接满", stock: 1 },
             { name: "复方汤剂", cost: "40 金加隆", desc: "可以变成另外一个人的样子，持续一小时。", effect: "伪装道具", stock: 2 },
             { name: "欢欣剂", cost: "10 金加隆", desc: "让人感到极度开心，甚至有点飘飘然。", effect: "心情+50", stock: 3 },
-            { name: "巴费醒脑剂", cost: "20 金加隆", desc: "号称能大幅度提升智力，应付考试专用。", effect: "学业临时提升", stock: 2 },
             { name: "打嗝药水", cost: "10 银西可", desc: "恶作剧药水，让人不停打嗝。", effect: "整蛊道具", stock: 5 },
             { name: "缩身药水", cost: "15 金加隆", desc: "使人或动物变小，逃跑或隐藏极佳。", effect: "潜行成功率提升", stock: 2 },
             { name: "白日梦魔药", cost: "5 金加隆", desc: "喝下后可以做三十分钟极度真实的白日梦。", effect: "心情+30", stock: 3 }
         ];
-    }
+    };
 
-    function openVivianShop() {
+    window.openVivianShop = function() {
         let vData = gameState.mapData.vivian;
-        if (!vData.items || vData.items.length === 0) {
-            vData.items = initVivianItems();
-        }
+        if (!vData.items || vData.items.length === 0) vData.items = window.initVivianItems();
+        if (vData.relation === undefined) vData.relation = 0;
+
+        let multiplier = getVivianMultiplier(vData.relation);
+        let relText = `薇薇安好感：${Math.floor(vData.relation)}`;
+        if (vData.relation >= 100) relText += " (熟客 85折)"; else if (vData.relation < 0) relText += " (恶意涨价)";
 
         let currentMoneyStr = knutsToString(getMoneyInKnuts(gameState.main.assets));
         let html = `
-            <div style="font-size:12px; color:gray; margin-bottom:10px;">白金色的头发，海蓝色的眼睛。少女神秘地向你拉开大衣：<br>"嘘，需要点特别的东西吗？只收金加隆，谢绝还价。"</div>
-            <div style="color:#CC9900; font-weight:bold; font-size:13px; margin-bottom:10px; border-bottom:1px dashed var(--border-color); padding-bottom:5px;">当前余额: ${currentMoneyStr}</div>
+            <div style="text-align:center; margin-bottom:10px;">
+                <div style="font-size:12px; color:gray; line-height:1.4; background:rgba(0,0,0,0.03); padding:6px 10px; border-radius:6px; display:inline-block; text-align:left;">
+                    白金色的头发，海蓝色的眼睛。少女傲慢地抱起手臂，冷冷地瞥了你一眼：<br>
+                    "嘘，需要点特别的东西吗？只收加隆...哼，穷鬼可别浪费我时间。"
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border-color); padding-bottom:5px; margin-bottom:10px;">
+                <span style="color:#CC9900; font-weight:bold; font-size:13px;">当前余额: ${currentMoneyStr}</span>
+                <span style="font-size:11px; font-weight:bold; color:${vData.relation < 0 ? 'red' : (vData.relation >= 100 ? '#006622' : 'purple')}">${relText}</span>
+            </div>
         `;
         
-        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; max-height:50vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
+        // 加入 align-items: start 让格子紧凑不留白
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; align-items:start; max-height:50vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
         
         vData.items.forEach(item => {
             let isSoldOut = item.stock <= 0;
-            let btnText = isSoldOut ? "已被扫空" : `交易 (${item.cost})`;
+            let adjustedKnuts = Math.floor(getMoneyInKnuts(item.cost) * multiplier);
+            let btnText = isSoldOut ? "已被扫空" : `交易 (${knutsToString(adjustedKnuts)})`;
             let btnStyle = isSoldOut ? "background-color: gray; color: white; border: none; cursor: not-allowed;" : "";
             
             html += `
-                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; opacity: ${isSoldOut ? '0.6' : '1'};">
-                    <div>
-                        <div style="font-weight:bold; font-size:13px; color: purple; display:flex; justify-content:space-between;">
-                            <span>${item.name}</span>
-                            <span style="font-size:11px; color:gray; font-weight:normal;">剩 ${item.stock}</span>
-                        </div>
-                        <div style="font-size:11px; color:gray; margin: 4px 0;">${item.desc}</div>
-                        <div style="font-size:11px; margin-bottom: 8px;">效果: ${item.effect}</div>
+                <div style="border: 1px solid var(--border-color); padding: 6px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; opacity: ${isSoldOut ? '0.6' : '1'};">
+                    <div style="font-weight:bold; font-size:12px; color: purple; display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <span>${item.name}</span>
+                        <span style="font-size:10px; color:gray; font-weight:normal;">剩 ${item.stock}</span>
                     </div>
-                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px; border-color:purple; color:purple; ${btnStyle}" 
+                    <div style="font-size:11px; color:gray; margin-bottom: 2px;">${item.desc}</div>
+                    <div style="font-size:11px; margin-bottom: 6px;">效果: ${item.effect}</div>
+                    <button class="btn btn-outline" style="margin-top:auto; padding:4px; width:100%; font-size:11px; border-color:purple; color:purple; ${btnStyle}" 
                             ${isSoldOut ? 'disabled' : `onclick="buyVivianItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')"`}>
                         ${btnText}
                     </button>
@@ -3718,16 +3743,13 @@ ${JSON.stringify(gameState.main)}
         html += '</div>';
 
         let refreshBtn = '';
-        if (gameState.turn - vData.lastRefreshTurn >= 10) {
-            refreshBtn = `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0; color:purple; border-color:purple;" onclick="refreshVivianShop()">换一批黑货</button>`;
-        } else {
-            let wait = 10 - (gameState.turn - vData.lastRefreshTurn);
-            refreshBtn = `<span style="font-size:12px; color:gray; margin-right:10px;">(等 ${wait} 周上新货)</span>`;
-        }
+        let lastTurn = vData.lastRefreshTurn === undefined ? -99 : vData.lastRefreshTurn;
+        if (gameState.turn - lastTurn >= 10) refreshBtn = `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0; color:purple; border-color:purple;" onclick="refreshVivianShop()">换一批黑货</button>`;
+        else refreshBtn = `<span style="font-size:12px; color:gray; margin-right:10px;">(等 ${10 - (gameState.turn - lastTurn)} 周进货)</span>`;
 
         openModal(`🧙‍♀️ 神奇的薇薇安`, html, `${refreshBtn}<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="closeModal()">不买了</button>`);
-    }
-
+    };
+		
     function buyVivianItem(itemName, costStr, desc, effect) {
         if (gameState.turn === 0) { alert("请先开启人生！"); return; }
         
@@ -4382,13 +4404,22 @@ ${JSON.stringify(gameState.main)}
         const item = gameState.inventory.find(i => i.id == id);
         if (item && item.name.includes("告白书") && item.content) {
             pendingEnvelopeData = { npcName: item.name.replace("与 ", "").replace(" 的告白书", ""), text: item.content };
-            closeModal(); showEnvelope(); return;
+            closeModal(); window.showEnvelope(); return;
         }
         if(item && item.amount > 0) {
             if (item.name.includes("画片") || item.name.includes("魔杖")) { alert("该物品不可直接使用！"); return; }
             item.amount--; if(item.amount <= 0) gameState.inventory = gameState.inventory.filter(i => i.id != id);
+            
             let alertMsg = `使用了 ${item.name}！\n状态已更新：${item.effect}`;
-            applyEffectToStatus(item.effect); updateUI(); closeModal(); alert(alertMsg);
+            if (item.name === "迷情剂") {
+                gameState.main.narcissusTurn = gameState.turn + 10;
+                gameState.main.status.mood = Math.min(100, (gameState.main.status.mood || 0) + 50);
+                alertMsg = `你喝下了迷情剂... 等等，你突然觉得自己是世界上最迷人、最完美的存在！你根本无法将视线从镜子里的自己身上移开！\n【获得词条：纳西塞斯 (持续10周)】【心情 +50】`;
+            } else {
+                applyEffectToStatus(item.effect);
+            }
+            if (typeof updateTraits === 'function') updateTraits();
+            updateUI(); closeModal(); alert(alertMsg);
         }
     };
     window.openFloatingEnvelope = function() { showEnvelope(); };
@@ -4670,11 +4701,11 @@ ${JSON.stringify(gameState.main)}
             </div>
         `;
         
-        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; max-height:50vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
+        // 加入 align-items: start 让格子紧贴内容高度
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; align-items:start; max-height:50vh; overflow-y:auto; padding-right:2px; padding-bottom:5px;">';
         
         vData.items.forEach(item => {
             let isSoldOut = item.stock <= 0;
-            // 根据好感度动态计算价格
             let originalKnuts = getMoneyInKnuts(item.cost);
             let adjustedKnuts = Math.floor(originalKnuts * multiplier);
             let adjustedCostStr = knutsToString(adjustedKnuts);
@@ -4683,17 +4714,15 @@ ${JSON.stringify(gameState.main)}
             let btnStyle = isSoldOut ? "background-color: gray; color: white; border: none; cursor: not-allowed;" : "";
             
             html += `
-                <div style="border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; opacity: ${isSoldOut ? '0.6' : '1'};">
-                    <div>
-                        <div style="font-weight:bold; font-size:13px; color: purple; display:flex; justify-content:space-between;">
-                            <span>${item.name}</span>
-                            <span style="font-size:11px; color:gray; font-weight:normal;">剩 ${item.stock}</span>
-                        </div>
-                        <div style="font-size:11px; color:gray; margin: 4px 0;">${item.desc}</div>
-                        <div style="font-size:11px; margin-bottom: 8px;">效果: ${item.effect}</div>
+                <div style="border: 1px solid var(--border-color); padding: 6px; border-radius: 6px; background: var(--card-bg); display: flex; flex-direction: column; opacity: ${isSoldOut ? '0.6' : '1'};">
+                    <div style="font-weight:bold; font-size:12px; color: purple; display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <span>${item.name}</span>
+                        <span style="font-size:10px; color:gray; font-weight:normal;">剩 ${item.stock}</span>
                     </div>
-                    <button class="btn btn-outline" style="margin:0; padding:4px; width:100%; font-size:12px; border-color:purple; color:purple; ${btnStyle}" 
-                            ${isSoldOut ? 'disabled' : `onclick="buyVivianItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')"`}>
+                    <div style="font-size:11px; color:gray; margin-bottom: 2px;">${item.desc}</div>
+                    <div style="font-size:11px; margin-bottom: 6px;">效果: ${item.effect}</div>
+                    <button class="btn btn-outline" style="margin-top:auto; padding:4px; width:100%; font-size:11px; border-color:purple; color:purple; ${btnStyle}" 
+                            ${isSoldOut ? 'disabled' : `onclick="window.buyVivianItem('${item.name}', '${item.cost}', '${item.desc}', '${item.effect}')"`}>
                         ${btnText}
                     </button>
                 </div>
@@ -5302,9 +5331,10 @@ ${JSON.stringify(gameState.main)}
         if(!url) return;
 
         let relationPrompt = "";
-        if (npc.romanceState === 'ambiguous') relationPrompt = "【非常重要：你和玩家当前正处于互相暧昧的阶段！你的回复必须深刻体现出脸红心跳、欲拒还迎的特殊暧昧感！】";
-        else if (npc.romanceState === 'dating') relationPrompt = "【非常重要：你和玩家当前是正式恋人！你的回复必须充满浓浓的爱意和专属的亲密感！】";
-
+        if (npc.lovePotionTurn && gameState.turn < npc.lovePotionTurn) relationPrompt = "【极其重要：由于迷情剂的作用，你现在对玩家处于极度痴迷、病态狂热的单相思状态！回复必须体现出这种失去理智的疯狂迷恋！】";
+        else if (npc.romanceState === 'ambiguous') relationPrompt = "【非常重要：你和玩家当前正处于互相暧昧的阶段！回复必须深刻体现出脸红心跳、欲拒还迎的特殊暧昧感！】";
+        else if (npc.romanceState === 'dating') relationPrompt = "【非常重要：你和玩家当前是正式恋人！回复必须充满浓浓的爱意和专属的亲密感！】";
+				
         try {
             let prompt = `你扮演《哈利波特》中的【${npc.name}】。玩家给你写信说：“${text}”。\n${relationPrompt}\n请根据你的人设回复。返回JSON：{"reply": "内容", "gift": "物品名称(可选)", "giftDesc": "", "giftEffect": ""}`;
             let res = await fetch(`${url}/v1/chat/completions`, { method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model, messages: [{ role: "user", content: prompt }], temperature: 0.7 }) });
@@ -5762,17 +5792,15 @@ ${JSON.stringify(gameState.main)}
             else chatHtml += `<div class="chat-msg ${msg.role}">${msg.text}</div>`;
         });
         chatHtml += `</div>
-        <div style="display:flex; gap:5px; margin-bottom:5px;">
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0;" onclick="askMoney(${id})">要钱</button>
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0;" onclick="askMeet(${id})">日常约见</button>
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0; border-color:#e91e63; color:#e91e63;" onclick="window.openMeetSystem(${id})">线下告白</button>
+        <div style="display:flex; gap:4px; margin-bottom:4px;">
+            <button class="btn btn-outline" style="flex:1; padding:2px 4px; font-size:11px; margin:0;" onclick="askMoney(${id})">要钱</button>
+            <button class="btn btn-outline" style="flex:1; padding:2px 4px; font-size:11px; margin:0;" onclick="askMeet(${id})">日常约见</button>
+            <button class="btn btn-outline" style="flex:1; padding:2px 4px; font-size:11px; margin:0; border-color:#e91e63; color:#e91e63;" onclick="window.openMeetSystem(${id})">线下告白</button>
+            <button class="btn btn-outline" style="flex:1; padding:2px 4px; font-size:11px; margin:0; border-color:#e91e63; color:#e91e63;" onclick="window.openConfessOnline(${id})">💌线上</button>
         </div>
-        <div style="display:flex; gap:5px; margin-bottom:5px;">
-            <button class="btn btn-outline" style="flex:1; padding:4px; font-size:12px; margin:0; border-color:#e91e63; color:#e91e63;" onclick="window.openConfessOnline(${id})">💌 线上表白</button>
-        </div>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="chatInput_${id}" placeholder="${npc.isWaitingMcConfess ? '落笔写下你的告白信...' : '写信内容...'}" style="margin:0; flex:1;">
-            <button class="btn" style="width:auto; margin:0;" onclick="window.sendChat(${id})">发送</button>
+        <div style="display:flex; gap:4px;">
+            <input type="text" id="chatInput_${id}" placeholder="${npc.isWaitingMcConfess ? '落笔写下你的告白信...' : '写信内容...'}" style="margin:0; flex:1; padding:4px; font-size:12px;">
+            <button class="btn" style="width:auto; margin:0; padding:4px 10px; font-size:12px;" onclick="window.sendChat(${id})">发送</button>
         </div>`;
         openModal(`✉️ 与 ${npc.name} 通信`, chatHtml, `<button class="btn btn-outline" style="width:auto; padding: 4px 12px; font-size: 12px; margin: 0;" onclick="showNPC(${id})">返回档案</button>`);
         setTimeout(() => { const box = document.getElementById(`chatBox_${id}`); if(box) box.scrollTop = box.scrollHeight; }, 100);
@@ -5969,7 +5997,7 @@ ${JSON.stringify(gameState.main)}
         const model = document.getElementById('apiModel').value;
 
         if(!url) { alert("请配置API！"); return; }
-        gameState.lastPrompt = userPrompt;
+
         document.getElementById('storyText').innerText = "命运编织中，请稍候...";
         
         const backupAttrs = JSON.parse(JSON.stringify(gameState.main.attributes || {}));
@@ -5977,10 +6005,14 @@ ${JSON.stringify(gameState.main)}
 
         let romanceList = gameState.npcs.filter(n => n.romanceState === 'ambiguous').map(n => n.name).join('、');
         let datingList = gameState.npcs.filter(n => n.romanceState === 'dating').map(n => n.name).join('、');
+        let potionList = gameState.npcs.filter(n => n.lovePotionTurn && gameState.turn < n.lovePotionTurn).map(n => n.name).join('、');
+        
         let romancePrompt = "";
+        if(gameState.main.narcissusTurn && gameState.main.narcissusTurn > gameState.turn) romancePrompt += "【纳西塞斯预警】你误饮了迷情剂，现在极度自恋！随时随地都要照镜子欣赏自己，请在日常剧情中体现出这种自恋感！\n";
+        if(potionList) romancePrompt += `【迷情剂预警】${potionList} 喝下了你的迷情剂！TA现在对你处于极度痴迷、病态狂热的单相思状态！只要TA出现，必须展现出疯狂的迷恋行为。\n`;
         if(romanceList) romancePrompt += `【恋爱预警】你正和 ${romanceList} 处于暧昧期！请在互动中深刻体现出脸红心跳、特殊的暧昧拉扯。\n`;
         if(datingList) romancePrompt += `【恋爱预警】你和 ${datingList} 是正式恋人！互动中请深刻体现出亲密、爱意与专属情节。\n`;
-
+				
         let currentTurnForPrompt = isRegenerate ? gameState.turn : (gameState.turn + 1);
         let yearNum = Math.floor((currentTurnForPrompt - 1) / 50) + 1;
         let weekInYear = (currentTurnForPrompt - 1) % 50 + 1;
@@ -6000,7 +6032,8 @@ ${timeConstraint}
 ${romancePrompt}
 - 属性(attributes)和成绩(grades)必须保留原状。
 - 状态(status)包括 magic, stamina, mood, health, reputation(0-100)。
-- 必须在剧情文末标明所有数值变动，例如：“体力-10。由于炸毁坩埚，声望-5。斯莱特林扣10分。”
+- 必须在剧情文末标明所有数值变动，例如：“体力-10。声望-5。斯莱特林扣10分。赫敏 好感度+5”。
+- 【绝对禁止】随意修改NPC的好感度(relation)！如果剧情中明确发生了好感度增减，必须在文本末尾写明，否则你必须将其保持原值！
 
 【输出格式绝对强制要求】
 必须且只能输出合法的JSON对象，无Markdown，无前言后语。严格如下：
@@ -6063,12 +6096,18 @@ ${JSON.stringify(gameState.main)}`;
                 });
             }
 
-            // 【核心修复】社交NPC数据加固：增量更新，保留旧好感与所有未提及NPC！
+               // 【核心修复】社交NPC数据加固：防止AI乱改好感度！
             if(parsedData.npcs && Array.isArray(parsedData.npcs)) {
                 parsedData.npcs.forEach(newNpc => {
                     let existing = gameState.npcs.find(n => n.name === newNpc.name);
                     if (existing) {
-                        if (newNpc.relation !== undefined) existing.relation = newNpc.relation;
+                        // 强制拦截：如果剧情文本里提到了该人物，才允许修改好感度，否则拒绝修改！
+                        if (newNpc.relation !== undefined && newNpc.relation !== existing.relation) {
+                            let shortName = newNpc.name.split('·')[0]; // 获取名字部分，兼容全名或简称
+                            if (gameState.story.text.includes(newNpc.name) || gameState.story.text.includes(shortName)) {
+                                existing.relation = newNpc.relation;
+                            }
+                        }
                         if (newNpc.desc) existing.desc = newNpc.desc;
                         if (newNpc.house) existing.house = newNpc.house;
                         if (newNpc.category) existing.category = newNpc.category;
@@ -6143,6 +6182,320 @@ ${JSON.stringify(gameState.main)}`;
         gameState.settings.customOptions.targetWords = parseInt(val) || 3000;
         if(typeof saveDataToLocal === 'function') saveDataToLocal();
     };
+	
+    // ========================================================== //
+    // ==== 终极防断连：教授办公室请教完全体覆盖补丁 ==== //
+    // ========================================================== //
+
+    // 将映射函数脱离 window 独立声明，防止读取不到
+    function getProfSubjectSafe(name) {
+        if(name.includes("麦格")) return { key: "transfiguration", n: "变形术" };
+        if(name.includes("斯内普")||name.includes("斯拉格霍恩")) return { key: "potions", n: "魔药课" };
+        if(name.includes("弗立维")) return { key: "charms", n: "魔咒课" };
+        if(name.includes("斯普劳特")) return { key: "herbology", n: "草药学" };
+        if(name.includes("特里劳妮")) return { key: "divination", n: "占卜学" };
+        if(name.includes("宾斯")) return { key: "history", n: "魔法史" };
+        if(name.includes("辛尼斯塔")) return { key: "astronomy", n: "天文学" };
+        if(name.includes("邓布利多")||name.includes("卢平")||name.includes("奇洛")||name.includes("穆迪")||name.includes("洛哈特")) return { key: "dada", n: "黑魔法防御术" };
+        return { key: "charms", n: "通用魔咒" };
+    }
+
+    // 核心请教逻辑
+    window.profTeach = function(profName) {
+        try {
+            if (!gameState.main.attributes) gameState.main.attributes = {};
+            if (!gameState.main.grades) gameState.main.grades = {};
+
+            let n = gameState.npcs.find(x => x.name.includes(profName));
+            let rel = n ? n.relation : 30;
+            let sub = getProfSubjectSafe(profName);
+            let subject = sub.key; 
+            let subName = sub.n;
+            
+            // 计算加分
+            let attrIncrease = Math.max(1, Math.floor(Math.random() * 3) + Math.floor(rel / 30));
+            gameState.main.attributes[subject] = Math.min(100, (gameState.main.attributes[subject]||0) + attrIncrease);
+            
+            let currentAttr = gameState.main.attributes[subject];
+            let baseGradeFromAttr = Math.floor(currentAttr * 0.3); 
+            let directGradeIncrease = Math.floor(Math.random() * 4) + Math.floor(rel / 20); 
+            
+            let oldGrade = gameState.main.grades[subject] || 0;
+            let newGrade = oldGrade + directGradeIncrease;
+            newGrade = Math.max(newGrade, baseGradeFromAttr + directGradeIncrease);
+            gameState.main.grades[subject] = Math.min(100, newGrade);
+            
+            // 核心修复：先弹窗，后刷新UI！确保不管后面怎样代码都不会被吃掉！
+            alert(`🎓 你向 ${profName} 虚心请教了【${subName}】的疑难问题。\n\n教授耐心地解答了你的疑惑：\n✨ 魔法面板：【${subName}】属性 +${attrIncrease}\n📜 成绩面板：【${subName}】总评显著提升！`);
+            
+            if(typeof updateUI === 'function') updateUI();
+        } catch (e) {
+            // 如果遇到暗病，强制弹出错误原因
+            alert("学术请教执行出错：" + e.message);
+            console.error(e);
+        }
+    };
+
+    // 敲门进入办公室的界面
+    window.meetProfessor = function(profName) {
+        if(typeof window.addTime === 'function') window.addTime(5);
+        let n = gameState.npcs.find(x => x.name.includes(profName));
+        if (!n) {
+            n = { id: Date.now(), name: profName, category: "校内", desc: "霍格沃茨教授", house: "教职工", relation: 30, chatHistory: [] };
+            gameState.npcs.push(n);
+            if(typeof updateUI === 'function') updateUI(); 
+        }
+        if(!n.chatHistory) n.chatHistory = [];
+        
+        let chatHtml = `<div id="prof-chat-box" style="height:120px; overflow-y:auto; font-size:12px; margin-bottom:4px; background:var(--bg-color); padding:4px; border-radius:4px; border:1px inset var(--border-color);">`;
+        if (n.chatHistory.length === 0) chatHtml += `<div style="color:gray; text-align:center;">暂无聊天记录，向教授打个招呼吧。</div>`;
+        n.chatHistory.forEach(msg => {
+            let align = msg.role === 'user' ? 'right' : 'left';
+            let color = msg.role === 'user' ? 'var(--primary-color)' : 'black';
+            chatHtml += `<div style="margin-bottom:4px; text-align:${align}; color:${color};">${msg.text}</div>`;
+        });
+        chatHtml += `</div>`;
+
+        let mcgonagallQuest = "";
+        if (profName.includes("麦格") && parseInt(gameState.main.age) >= 13 && (!gameState.mapData || !gameState.mapData.hogsmeadeUnlocked)) {
+            mcgonagallQuest = `<button class="btn" style="width:100%; margin-bottom:4px; padding:4px; font-size:12px; background-color:#CC9900; color:black; border:none;" onclick="if(typeof submitPermissionForm === 'function') submitPermissionForm()">📝 提交霍格莫德同意书</button>`;
+        }
+
+        let html = `
+            <div style="text-align:center; margin-bottom:6px;">
+                <span style="font-size:12px; color:gray; background:rgba(0,0,0,0.05); padding:4px 8px; border-radius:6px; display:inline-block;">你推门进入办公室，${profName} 抬头看了你一眼。</span>
+            </div>
+            ${mcgonagallQuest}
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-weight:bold; font-size:12px; color:var(--primary-color);">💬 互动与闲聊</span>
+                    <!-- 绝对绑定：强制使用 window.profTeach -->
+                    <button class="btn btn-outline" style="width:auto; margin:0; padding:2px 6px; font-size:11px;" onclick="window.profTeach('${profName}')">📖 学术请教</button>
+                </div>
+                ${chatHtml}
+                <div style="display:flex; gap:4px; margin-top:4px;">
+                    <input type="text" id="prof-chat-input" placeholder="和教授说点什么..." style="flex:1; margin:0; padding:4px; border-radius:4px; font-size:12px;">
+                    <button class="btn" style="width:auto; margin:0; padding:4px 10px; font-size:12px;" onclick="window.profChat('${profName}')">发送</button>
+                </div>
+            </div>
+        `;
+        openModal(`🚪 ${profName} 的办公室`, html);
+        setTimeout(() => { let box = document.getElementById('prof-chat-box'); if(box) box.scrollTop = box.scrollHeight; }, 100);
+    };
+
+    // 走廊进入教授办公区大门的界面
+    window.enterOffices = async function() {
+        if (typeof checkHogwartsAdmitted === 'function' && !checkHogwartsAdmitted()) return;
+        if (typeof patchMapData === 'function') patchMapData();
+        if (typeof addTime === 'function') addTime(5);
+
+        if(!gameState.mapData.professors) {
+            gameState.mapData.professors = ["米勒娃·麦格", "西弗勒斯·斯内普", "菲利乌斯·弗立维", "波莫娜·斯普劳特", "西比尔·特里劳妮", "罗兰达·霍琦"];
+        }
+        
+        gameState.mapData.currentLoc = "教授办公室";
+        document.getElementById('map-main-view').style.display = 'none';
+        document.getElementById('map-location-view').style.display = 'block';
+        document.getElementById('loc-title').innerText = `📍 教授办公区`;
+        document.getElementById('loc-actions').innerHTML = '';
+        
+        let npcHtml = '';
+        gameState.mapData.professors.forEach(prof => {
+            let inOffice = Math.random() < 0.8;
+            let subInfo = getProfSubjectSafe(prof);
+            npcHtml += `<div style="border:1px solid var(--border-color); padding:5px 8px; margin-bottom:5px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:13px;">${prof} 教授 <span style="font-size:11px; color:#990000;">[${subInfo.n}]</span></div>
+                    <div style="font-size:11px; color:gray;">${inOffice ? '正在批改作业' : '门锁着'}</div>
+                </div>
+                <!-- 绝对绑定：强制使用 window.meetProfessor -->
+                <button class="btn btn-outline" style="width:auto; padding:2px 8px; margin:0; font-size:12px;" ${inOffice ? `onclick="window.meetProfessor('${prof}')"` : 'disabled'}>敲门</button>
+            </div>`;
+        });
+        document.getElementById('loc-npcs').innerHTML = npcHtml;
+    };
+		
+		    // ========================================================== //
+    // ==== 终极修正补丁：强分类/严控好感/数据统计/彻底回滚 ==== //
+    // ========================================================== //
+
+    // 1. 彻底回滚机制：删除某一周
+    window.deleteWeek = function(turnIndex) {
+        if(!confirm(`⚠️ 确定要删除第 ${turnIndex} 周及之后的所有进度吗？\n时光倒流至第 ${turnIndex - 1} 周，包括所有属性、背包、社交的改变都将被抹除！`)) return;
+        if (typeof closeModal === 'function') closeModal();
+        let targetTurn = turnIndex - 1;
+        gameState.history.length = targetTurn;
+        gameState.maxTurn = targetTurn;
+        gameState.turn = targetTurn;
+        gameState.turnDrafts = []; 
+        
+        if (targetTurn > 0 && gameState.history[targetTurn - 1]) {
+            let state = gameState.history[targetTurn - 1];
+            // 彻底覆盖所有数据层
+            gameState.main = JSON.parse(JSON.stringify(state.main));
+            gameState.story = JSON.parse(JSON.stringify(state.story));
+            gameState.inventory = JSON.parse(JSON.stringify(state.inventory));
+            gameState.npcs = JSON.parse(JSON.stringify(state.npcs));
+        } else {
+            gameState.story.text = "请前往【设置】页面最底部，点击【✨ 开启人生】开始你的霍格沃茨之旅...";
+            gameState.story.options = [];
+            gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+            gameState.inventory = [];
+            gameState.npcs = [];
+        }
+        if (typeof updateUI === 'function') updateUI();
+        alert(`🕰️ 时光倒流成功！已回到第 ${targetTurn} 周的原始状态。`);
+    };
+
+    // 2. 彻底回滚机制：重生当周剧情
+    window.regenerateWeek = function() {
+        if(!gameState.lastPrompt) { alert("没有可重新生成的记录！"); return; }
+        
+        // 存入草稿箱
+        if (!gameState.turnDrafts) gameState.turnDrafts = [];
+        gameState.turnDrafts.push(JSON.parse(JSON.stringify({
+            main: gameState.main, story: gameState.story, inventory: gameState.inventory, npcs: gameState.npcs
+        })));
+        
+        // 核心修复：重生前，先把数据状态回滚到本周开始前的样子！
+        let targetTurn = gameState.turn - 1;
+        if (targetTurn > 0 && gameState.history[targetTurn - 1]) {
+            let state = gameState.history[targetTurn - 1];
+            gameState.main = JSON.parse(JSON.stringify(state.main));
+            gameState.inventory = JSON.parse(JSON.stringify(state.inventory));
+            gameState.npcs = JSON.parse(JSON.stringify(state.npcs));
+        } else {
+            // 第一周重生
+            gameState.main.status = { magic: 100, stamina: 100, mood: 100, health: 100 };
+            gameState.inventory = [];
+            gameState.npcs = [];
+        }
+        
+        window.callAPI(gameState.lastPrompt, true);
+    };
+
+    // 3. UI拦截：强化社交分类判定 & 上下文统计修正
+    const baseUpdateUI = window.updateUI;
+    window.updateUI = function() {
+        if (baseUpdateUI) baseUpdateUI();
+
+        // 修正统计UI
+        if(document.getElementById('stat-tokens') && gameState.stats) {
+            document.getElementById('stat-tokens').innerText = gameState.stats.totalTokens || 0;
+            document.getElementById('stat-chars').innerText = gameState.stats.totalChars || 0;
+        }
+
+        const socList = document.getElementById('socialList');
+        if(!socList) return;
+        socList.innerHTML = '';
+        if(gameState.npcs.length === 0) { socList.innerHTML = '<div style="color:gray; text-align:center; font-size:12px; padding:10px;">暂无联系人</div>'; return; }
+        
+        const categories = { '恋人': [], '老师': [], '同学': [], '校外': [], '宠物': [] };
+        
+        gameState.npcs.forEach(npc => {
+            let cap = (npc.romanceState === 'ambiguous' || npc.romanceState === 'dating') ? 200 : 100;
+            if(npc.relation > cap) npc.relation = cap;
+
+            if (npc.romanceState === 'dating') { categories['恋人'].push(npc); return; }
+            
+            let descStr = (npc.desc || "") + (npc.house || "") + (npc.name || "");
+            let cat = npc.category || '校内';
+
+            // 【核心修复】：绝对强制归类判定
+            if (descStr.includes("宠物") || descStr.includes("猫头鹰") || descStr.includes("蟾蜍") || descStr.includes("猫") || cat === '宠物') {
+                npc.category = '宠物';
+                categories['宠物'].push(npc);
+            } else if (descStr.includes("教授") || descStr.includes("老师") || descStr.includes("校长") || descStr.includes("教职工") || descStr.includes("管理员") || descStr.match(/斯内普|麦格|邓布利多|费尔奇|弗立维|斯普劳特/)) {
+                npc.category = '校内';
+                categories['老师'].push(npc);
+            } else if (cat === '校内') {
+                categories['同学'].push(npc);
+            } else {
+                categories['校外'].push(npc);
+            }
+        });
+
+        for (let cat in categories) {
+            if (categories[cat].length === 0) continue;
+            let icon = cat === '恋人' ? '💖' : (cat === '宠物' ? '🐾' : (cat === '老师' ? '📚' : (cat === '同学' ? '🎓' : '🌲')));
+            let catHtml = `<div class="social-category"><div class="social-category-header" onclick="this.nextElementSibling.classList.toggle('open')"><span>${icon} ${cat} (${categories[cat].length})</span><span>▼</span></div><div class="social-category-content">`;
+            
+            categories[cat].forEach(npc => {
+                let heartHtml = '';
+                if (cat !== '宠物' && npc.category !== '宠物') {
+                    if (npc.relation >= 100 && !npc.romanceState) {
+                        heartHtml = `<span class="pulse-heart" onclick="event.stopPropagation(); window.triggerRomance(${npc.id})">♡</span>`;
+                    } else if (npc.romanceState === 'ambiguous') {
+                        if (npc.relation >= 200) heartHtml = `<span class="pulse-heart" style="color:red; font-size:16px; font-weight:bold;" onclick="event.stopPropagation(); window.triggerConfessChoice(${npc.id})">♥</span>`;
+                        else heartHtml = `<span style="color:#e91e63; margin-left:5px;">♡</span>`;
+                    } else if (npc.romanceState === 'dating') {
+                        heartHtml = `<span style="color:red; margin-left:5px;">💖</span>`;
+                    }
+                }
+                catHtml += `<div class="list-item" onclick="showNPC(${npc.id})"><span>${npc.name}${heartHtml}</span><span style="font-size:12px; color:var(--primary-color);">${npc.house || ''} | 好感:${Math.floor(npc.relation)}</span></div>`;
+            });
+            catHtml += `</div></div>`;
+            socList.innerHTML += catHtml;
+        }
+    };
+
+    // 4. 拦截API：严格正则提取好感加减，修复字数/Token统计
+    const prevCallAPIForStatsAndRelation = window.callAPI;
+    window.callAPI = async function(userPrompt, isRegenerate = false) {
+        const url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+        const key = document.getElementById('apiKey').value;
+        const model = document.getElementById('apiModel').value;
+        if(!url) { alert("请配置API！"); return; }
+        
+        // 保留原数据以备比对
+        const backupNpcs = JSON.parse(JSON.stringify(gameState.npcs || []));
+
+        // 强行附加严格规则到原prompt (截取并追加)
+        let modifiedPrompt = userPrompt + "\n【系统强制指令】：如果NPC好感度有增减，绝对不要直接改变属性值！你必须在story.text的剧情文本最末尾明确写出如“赫敏好感度+5”、“斯内普好感度-10”，系统会利用正则捕获文本。";
+        
+        // 调用之前的执行流程
+        if (prevCallAPIForStatsAndRelation) await prevCallAPIForStatsAndRelation(modifiedPrompt, isRegenerate);
+        
+        // === API执行完毕后，进行后期处理 ===
+        
+        // 1. 恢复被AI乱改的好感度 (仅保留旧有数值，拒绝JSON内的数据改变)
+        gameState.npcs.forEach(npc => {
+            let oldNpc = backupNpcs.find(old => old.name === npc.name || old.id === npc.id);
+            if (oldNpc) {
+                npc.relation = oldNpc.relation; // 强制回滚为本回合前的好感
+            } else {
+                if (npc.relation === undefined) npc.relation = 0; // 新角色默认
+            }
+        });
+
+        // 2. 智能提取文本中明确提到的好感度加减
+        if (gameState.story && gameState.story.text) {
+            let storyText = gameState.story.text;
+            // 匹配格式例如：赫敏好感度+3, 斯内普好感-5
+            let relationRegex = /([^\s，。！？,.\!\?]+?)\s*好感(?:度)?\s*([+-])\s*(\d+)/g;
+            let matchRel;
+            while ((matchRel = relationRegex.exec(storyText)) !== null) {
+                let targetName = matchRel[1].trim();
+                let sign = matchRel[2] === '+' ? 1 : -1;
+                let val = parseInt(matchRel[3]);
+                
+                let targetNpc = gameState.npcs.find(n => n.name.includes(targetName) || targetName.includes(n.name.split('·')[0]));
+                if (targetNpc) {
+                    targetNpc.relation = Math.min(200, Math.max(-100, (targetNpc.relation || 0) + (sign * val)));
+                }
+            }
+        }
+        
+        // 3. 统计Tokens和字数 (由于跨函数作用域，我们重新请求一次轻量估算或尝试提取)
+        // 注意: 原函数内由于直接改了DOM，这里我们只能统计生成的字数。Tokens采用字符估算法(1字≈1.5Token)，或直接在原JSON里追加。
+        if (!gameState.stats) gameState.stats = { totalTokens: 0, totalChars: 0 };
+        if (gameState.story && gameState.story.text) {
+            gameState.stats.totalChars += gameState.story.text.length;
+            gameState.stats.totalTokens += Math.floor(gameState.story.text.length * 1.5) + 1500; // 粗略估算本次花费
+        }
+        
+        if (typeof updateUI === "function") updateUI();
+    };
 </script>
 </body>
-    </html>
+</html>
